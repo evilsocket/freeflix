@@ -25,7 +25,7 @@ Freeflix is an AI-powered movie and TV show discovery and download system, packa
 │                                                      │
 │   "Download #1"                                      │
 │                                                      │
-│   > Queued! Check Torra TUI for progress (Ctrl-b )   │
+│   > Queued! Check Torra TUI for progress (Ctrl-b Left/Right   │
 │                                                      │
 └──────────────────────────────────────────────────────┘
 ```
@@ -39,18 +39,27 @@ Freeflix orchestrates four components inside a single container:
 - **[OpenCode](https://opencode.ai/)** — AI coding agent repurposed as a conversational movie assistant. Uses a custom system prompt with full operational instructions for searching, downloading, and managing torrents.
 - **[Trakt MCP Server](https://github.com/wwiens/trakt_mcpserver)** *(optional)* — When Trakt credentials are provided, the agent uses your watch history and ratings as ground truth to build a taste profile, avoid re-recommending watched content, and personalize suggestions.
 
-Two tmux sessions are available:
+Three tmux sessions are available, navigable with `Ctrl-b Left/Right`:
 
-| Session | Content | Switch to |
-|---------|---------|-----------|
-| `main` | OpenCode AI agent (attached by default) | `Ctrl-b )` to leave |
-| `torra` | Torra download TUI | `Ctrl-b )` to enter |
+| Session | Content |
+|---------|---------|
+| `jackett` | Jackett indexer logs |
+| `torra` | Torra download TUI |
+| `main` | OpenCode AI agent (attached by default) |
+
+```
+  Ctrl-b Left                    Ctrl-b Right
+  <────────── jackett | torra | main ──────────>
+```
 
 ## Quick Start
 
 ```bash
 docker build -t freeflix .
-docker run -it --name freeflix -v "$(pwd):/downloads" freeflix
+docker run -it --rm --name freeflix \
+  -v "$(pwd):/downloads" \
+  -v "$HOME/.freeflix:/data" \
+  freeflix
 ```
 
 Downloads will appear in your current working directory.
@@ -71,17 +80,21 @@ Downloads will appear in your current working directory.
 **Minimal** — uses OpenCode Zen free tier, no Trakt:
 
 ```bash
-docker run -it --name freeflix -v "$(pwd):/downloads" freeflix
+docker run -it --rm --name freeflix \
+  -v "$(pwd):/downloads" \
+  -v "$HOME/.freeflix:/data" \
+  freeflix
 ```
 
 **With Anthropic and Trakt**:
 
 ```bash
-docker run -it --name freeflix \
+docker run -it --rm --name freeflix \
   -e ANTHROPIC_API_KEY="sk-..." \
   -e TRAKT_CLIENT_ID="your_client_id" \
   -e TRAKT_CLIENT_SECRET="your_client_secret" \
   -v "$(pwd):/downloads" \
+  -v "$HOME/.freeflix:/data" \
   freeflix
 ```
 

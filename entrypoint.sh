@@ -1,55 +1,69 @@
 #!/bin/bash
 set -e
 
+# Trap to clean up background processes on exit
+trap 'tmux kill-server 2>/dev/null; exit 0' EXIT INT TERM
+
 echo "[freeflix] Starting services..."
 
-# ── 1. Start Jackett in background ──
+# ── 0. Configure tmux keybindings ──
+cat > /root/.tmux.conf << 'TMUX'
+# Switch sessions with Ctrl-b + left/right arrows
+bind-key Left switch-client -p
+bind-key Right switch-client -n
+TMUX
+
+# ── 1. Pre-seed Jackett indexer configs on disk ──
+echo "[freeflix] Pre-configuring Jackett indexers..."
+mkdir -p /config/jackett/Indexers
+
+# For public indexers, Jackett just needs the config file to exist with an empty array
+for indexer in thepiratebay 1337x; do
+  echo "[]" > "/config/jackett/Indexers/$indexer.json"
+  echo "[freeflix]   + $indexer pre-configured"
+done
+
+# UIndex: attempt (may not exist as a valid indexer id)
+echo "[]" > "/config/jackett/Indexers/uindex.json"
+echo "[freeflix]   + uindex pre-configured (may be removed by Jackett if unsupported)"
+
+# ── 2. Start Jackett in its own tmux session ──
 echo "[freeflix] Starting Jackett..."
-mkdir -p /config/jackett
-/opt/Jackett/jackett --NoUpdates --NoRestart --DataFolder /config/jackett &
-JACKETT_PID=$!
+tmux new-session -d -s jackett \
+  "/opt/Jackett/jackett --NoUpdates --NoRestart --DataFolder /config/jackett; echo '[freeflix] Jackett exited. Press enter for shell.'; read; exec bash"
 
 # Wait for Jackett to be ready
 echo "[freeflix] Waiting for Jackett to be ready..."
 until curl -sf http://localhost:9117 > /dev/null 2>&1; do
-  # Make sure Jackett is still running
-  if ! kill -0 $JACKETT_PID 2>/dev/null; then
-    echo "[freeflix] ERROR: Jackett process died"
+  if ! tmux has-session -t jackett 2>/dev/null; then
+    echo "[freeflix] ERROR: Jackett session died"
     exit 1
   fi
   sleep 1
 done
 echo "[freeflix] Jackett is ready"
 
-# ── 2. Extract Jackett API key ──
+# ── 3. Extract Jackett API key ──
 JACKETT_API_KEY=$(jq -r '.APIKey' /config/jackett/ServerConfig.json)
 echo "[freeflix] Jackett API key: ${JACKETT_API_KEY:0:8}..."
 
-# ── 3. Enable indexers via Jackett API ──
-echo "[freeflix] Enabling indexers..."
-for indexer in thepiratebay 1337x; do
-  if cfg=$(curl -sf "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY"); then
-    if curl -sf -X POST "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" \
-      -H "Content-Type: application/json" -d "$cfg" > /dev/null; then
-      echo "[freeflix]   + $indexer enabled"
-    else
-      echo "[freeflix]   ! $indexer failed to configure"
-    fi
-  else
-    echo "[freeflix]   ! $indexer not found"
-  fi
-done
-
-# UIndex: attempt, warn if unavailable
-if cfg=$(curl -sf "http://localhost:9117/api/v2.0/indexers/uindex/config?apikey=$JACKETT_API_KEY" 2>/dev/null); then
-  if curl -sf -X POST "http://localhost:9117/api/v2.0/indexers/uindex/config?apikey=$JACKETT_API_KEY" \
-    -H "Content-Type: application/json" -d "$cfg" > /dev/null 2>&1; then
-    echo "[freeflix]   + uindex enabled"
-  else
-    echo "[freeflix]   ! uindex failed to configure"
-  fi
+# ── 4. Verify indexers are loaded ──
+echo "[freeflix] Verifying indexers..."
+CONFIGURED=$(curl -sf "http://localhost:9117/api/v2.0/indexers?apikey=$JACKETT_API_KEY&configured=true" | jq -r '.[].id' 2>/dev/null)
+if [ -n "$CONFIGURED" ]; then
+  for id in $CONFIGURED; do
+    echo "[freeflix]   + $id loaded"
+  done
 else
-  echo "[freeflix]   ~ uindex not available in this Jackett version (skipped)"
+  echo "[freeflix]   ! No indexers loaded via pre-seed, trying API fallback..."
+  # Fallback: enable via API
+  for indexer in thepiratebay 1337x uindex; do
+    cfg=$(curl -sf "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" 2>/dev/null) || continue
+    curl -sf -X POST "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" \
+      -H "Content-Type: application/json" -d "$cfg" > /dev/null 2>&1 && \
+      echo "[freeflix]   + $indexer enabled via API" || \
+      echo "[freeflix]   ! $indexer failed"
+  done
 fi
 
 # ── 4. Configure Torra ──
@@ -60,12 +74,11 @@ torrra config set indexers.default jackett
 torrra config set general.download_path /downloads
 torrra config set general.theme dracula
 
-# ── 5. Discover or create Torra SQLite DB ──
-TORRA_DATA_DIR="$HOME/.local/share/torrra"
-mkdir -p "$TORRA_DATA_DIR"
-TORRA_DB=$(find "$TORRA_DATA_DIR" -name "*.db" -type f 2>/dev/null | head -1)
-if [ -z "$TORRA_DB" ]; then
-  TORRA_DB="$TORRA_DATA_DIR/torrra.db"
+# ── 5. Set up persistent Torra SQLite DB ──
+# /data is a dedicated volume mounted to ~/.freeflix on the host
+TORRA_DB="/data/torrra.db"
+mkdir -p /data
+if [ ! -f "$TORRA_DB" ]; then
   sqlite3 "$TORRA_DB" "CREATE TABLE IF NOT EXISTS torrents (
     magnet_uri TEXT PRIMARY KEY,
     title TEXT,
@@ -76,8 +89,11 @@ if [ -z "$TORRA_DB" ]; then
   );"
   echo "[freeflix] Created Torra database at $TORRA_DB"
 else
-  echo "[freeflix] Found Torra database at $TORRA_DB"
+  echo "[freeflix] Restored Torra database from $TORRA_DB"
 fi
+# Symlink so Torra finds it at its expected location
+mkdir -p "$HOME/.local/share/torrra"
+ln -sf "$TORRA_DB" "$HOME/.local/share/torrra/torrra.db"
 
 # ── 6. Determine model ──
 MODEL="${OPENCODE_MODEL:-opencode/kimi-k2.5-free}"
@@ -94,9 +110,22 @@ echo "[freeflix] Processing config templates..."
 mkdir -p /work
 
 # Agent prompt: substitute placeholders
-sed -e "s|{{JACKETT_API_KEY}}|$JACKETT_API_KEY|g" \
-    -e "s|{{TORRA_DB}}|$TORRA_DB|g" \
-    /opt/freeflix/config/AGENT_PROMPT.md > /work/AGENT_PROMPT.md
+cp /opt/freeflix/config/AGENT_PROMPT.md /work/AGENT_PROMPT.md
+sed -i -e "s|{{JACKETT_API_KEY}}|$JACKETT_API_KEY|g" \
+       -e "s|{{TORRA_DB}}|$TORRA_DB|g" \
+       /work/AGENT_PROMPT.md
+
+# Trakt: include or strip section based on credentials
+if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
+  sed -i -e 's|{{TRAKT_INTRO}}|You also have **Trakt MCP tools** for personalized recommendations based on watch history and ratings.|' \
+         -e '/{{TRAKT_SECTION_START}}/d' \
+         -e '/{{TRAKT_SECTION_END}}/d' \
+         /work/AGENT_PROMPT.md
+else
+  sed -i -e 's|{{TRAKT_INTRO}}|For recommendations, use your own movie/TV knowledge. Ask the user what they like and build preferences conversationally.|' \
+         -e '/{{TRAKT_SECTION_START}}/,/{{TRAKT_SECTION_END}}/d' \
+         /work/AGENT_PROMPT.md
+fi
 
 # OpenCode config: set model and conditionally inject Trakt MCP
 MCP_SECTION='{}'
@@ -123,19 +152,76 @@ jq --arg model "$MODEL" --argjson mcp "$MCP_SECTION" \
   '.model = $model | .mcp = $mcp' \
   /opt/freeflix/config/opencode.json > /work/opencode.json
 
-# ── 8. Launch tmux sessions ──
+# ── 8. Set up non-root user for downloads ──
+# Auto-detect host UID/GID from the /downloads mount so files are owned by the host user
+DOWNLOADS_UID=$(stat -c '%u' /downloads)
+DOWNLOADS_GID=$(stat -c '%g' /downloads)
+
+if [ "$DOWNLOADS_UID" != "0" ]; then
+  echo "[freeflix] Downloads directory owned by UID=$DOWNLOADS_UID GID=$DOWNLOADS_GID"
+  groupadd -g "$DOWNLOADS_GID" freeflix 2>/dev/null || true
+  useradd -u "$DOWNLOADS_UID" -g "$DOWNLOADS_GID" -m -s /bin/bash freeflix 2>/dev/null || true
+
+  # Set up torra config and DB for the freeflix user
+  mkdir -p /home/freeflix/.config/torrra /home/freeflix/.local/share/torrra
+  cp "$HOME/.config/torrra/config.toml" /home/freeflix/.config/torrra/config.toml
+  ln -sf "$TORRA_DB" /home/freeflix/.local/share/torrra/torrra.db
+  chown -R "$DOWNLOADS_UID:$DOWNLOADS_GID" /home/freeflix /downloads /data
+
+  TORRA_RUN="gosu freeflix"
+  echo "[freeflix] Torra will run as user freeflix ($DOWNLOADS_UID:$DOWNLOADS_GID)"
+else
+  TORRA_RUN=""
+  echo "[freeflix] Downloads directory owned by root, Torra will run as root"
+fi
+
+# ── 9. Verify binaries ──
+OPENCODE_BIN=$(command -v opencode 2>/dev/null || true)
+TORRRA_BIN=$(command -v torrra 2>/dev/null || true)
+
+if [ -z "$OPENCODE_BIN" ]; then
+  echo "[freeflix] ERROR: opencode not found in PATH"
+  echo "[freeflix] PATH=$PATH"
+  find / -name opencode -type f 2>/dev/null || true
+  exit 1
+fi
+
+if [ -z "$TORRRA_BIN" ]; then
+  echo "[freeflix] ERROR: torrra not found in PATH"
+  exit 1
+fi
+
+echo "[freeflix] Found opencode at $OPENCODE_BIN"
+echo "[freeflix] Found torrra at $TORRRA_BIN"
+
+# ── 10. Launch remaining tmux sessions ──
 echo "[freeflix] Launching tmux sessions..."
 
-# Torra TUI in background session
+# Torra TUI session (runs as host user so downloads have correct ownership)
 tmux new-session -d -s torra \
-  "torrra jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY"
+  "$TORRA_RUN $TORRRA_BIN jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY; echo '[freeflix] Torra exited. Press enter for shell.'; read; exec bash"
 
-# OpenCode agent in main session
+# Switch Torra TUI to Downloads view after it initializes
+(sleep 3 && tmux send-keys -t torra 'j' && sleep 0.2 && tmux send-keys -t torra 'l') &
+
+# OpenCode agent session
 tmux new-session -d -s main \
-  "cd /work && opencode"
+  "cd /work && $OPENCODE_BIN; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 
+# Give sessions a moment to initialize
+sleep 1
+
+# Verify main session is alive
+if ! tmux has-session -t main 2>/dev/null; then
+  echo "[freeflix] ERROR: main tmux session failed to start"
+  echo "[freeflix] Falling back to shell..."
+  exec bash
+fi
+
+echo ""
 echo "[freeflix] Ready! Attaching to OpenCode session..."
-echo "[freeflix] Tip: Switch to Torra TUI with Ctrl-b )"
+echo "[freeflix] Sessions: Ctrl-b Left/Right to switch"
+echo "[freeflix]   <- jackett | torra | main (opencode) ->"
 echo ""
 
 # Attach to the main OpenCode session
