@@ -195,7 +195,19 @@ fi
 echo "[freeflix] Found opencode at $OPENCODE_BIN"
 echo "[freeflix] Found torrra at $TORRRA_BIN"
 
-# ── 10. Launch remaining tmux sessions ──
+# ── 10. Persist OpenCode sessions ──
+# Symlink OpenCode data dir to /data so sessions survive container restarts
+mkdir -p /data/opencode
+ln -sfn /data/opencode "$HOME/.local/share/opencode"
+
+# Auto-resume last session if one exists
+OPENCODE_RESUME=""
+if [ -d /data/opencode ] && ls /data/opencode/*.session 2>/dev/null | head -1 > /dev/null 2>&1; then
+  OPENCODE_RESUME="--continue"
+  echo "[freeflix] Found previous session, will resume"
+fi
+
+# ── 11. Launch remaining tmux sessions ──
 echo "[freeflix] Launching tmux sessions..."
 
 # Torra TUI session (runs as host user so downloads have correct ownership)
@@ -205,9 +217,9 @@ tmux new-session -d -s torra \
 # Switch Torra TUI to Downloads view after it initializes
 (sleep 3 && tmux send-keys -t torra 'j' && sleep 0.2 && tmux send-keys -t torra 'l') &
 
-# OpenCode agent session
+# OpenCode agent session (resumes last session if available)
 tmux new-session -d -s main \
-  "cd /work && $OPENCODE_BIN; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
+  "cd /work && $OPENCODE_BIN $OPENCODE_RESUME; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 
 # Give sessions a moment to initialize
 sleep 1
