@@ -131,13 +131,14 @@ fi
 MCP_SECTION='{}'
 if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
   echo "[freeflix] Trakt credentials found, enabling Trakt MCP server"
+  # Run from /data so auth_token.json persists across restarts
   MCP_SECTION=$(jq -n \
     --arg cid "$TRAKT_CLIENT_ID" \
     --arg csec "$TRAKT_CLIENT_SECRET" \
     '{
       trakt: {
         type: "local",
-        command: ["python3", "/opt/trakt_mcpserver/server.py"],
+        command: ["sh", "-c", "cd /data && exec python3 /opt/trakt_mcpserver/server.py"],
         environment: {
           TRAKT_CLIENT_ID: $cid,
           TRAKT_CLIENT_SECRET: $csec

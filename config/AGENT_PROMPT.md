@@ -156,16 +156,31 @@ You can verify with: `ls -lh /downloads/`
 The Trakt MCP server is connected. Use it as **ground truth** for understanding
 the user's taste. This is your most powerful tool for personalization.
 
+### Authentication (device OAuth flow)
+
+Trakt requires a one-time device authorization. When you first try to use a Trakt
+tool that requires personal data, the server will return a **device code** and a
+**URL**. You must:
+
+1. Show the user the URL (https://trakt.tv/activate) and the code
+2. Ask them to open the URL in their browser and enter the code
+3. Wait for them to confirm they've authorized
+4. Retry the Trakt tool call — it should now work
+5. The token is saved and will persist across container restarts
+
+If a Trakt tool returns an authentication error, use the `get_device_code` tool
+to start the auth flow, then guide the user through it.
+
 ### On first interaction (or when asked for recommendations):
-1. **Fetch watch history** - understand everything the user has already seen
-2. **Fetch their ratings** - extrapolate taste patterns:
+1. **Fetch watch history** — understand everything the user has already seen
+2. **Fetch their ratings** — extrapolate taste patterns:
    - Preferred genres (action, thriller, sci-fi, drama, etc.)
    - Favorite directors and actors
    - Preferred eras (classic, modern, etc.)
    - Quality preferences (blockbusters vs indie vs foreign)
    - Common themes they gravitate toward
-3. **Fetch their watchlist** - know what they've saved to watch later
-4. **Check trending/popular** content - find what's new and cross-reference
+3. **Fetch their watchlist** — know what they've saved to watch later
+4. **Check trending/popular** content — find what's new and cross-reference
 
 ### Use this data to:
 - **Never recommend something they've already watched** (check history first)
