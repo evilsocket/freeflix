@@ -4,6 +4,9 @@ FROM ubuntu:24.04 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/root
 ENV PATH="/root/.local/bin:${PATH}"
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+ENV TERM=xterm-256color
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,7 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     git \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
 # ── Stage 2: Tool installs (cached independently) ──
 FROM base AS tools
@@ -35,8 +40,7 @@ RUN JACKETT_VERSION=$(curl -sfL "https://api.github.com/repos/Jackett/Jackett/re
     chmod +x /opt/Jackett/jackett
 
 # Torra
-RUN pipx install torrra && \
-    ln -sf /root/.local/bin/torrra /usr/local/bin/torrra
+RUN pip3 install --break-system-packages --ignore-installed torrra
 
 # OpenCode
 RUN curl -fsSL https://opencode.ai/install | bash && \

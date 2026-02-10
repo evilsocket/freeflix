@@ -159,17 +159,17 @@ DOWNLOADS_GID=$(stat -c '%g' /downloads)
 
 if [ "$DOWNLOADS_UID" != "0" ]; then
   echo "[freeflix] Downloads directory owned by UID=$DOWNLOADS_UID GID=$DOWNLOADS_GID"
-  groupadd -g "$DOWNLOADS_GID" freeflix 2>/dev/null || true
-  useradd -u "$DOWNLOADS_UID" -g "$DOWNLOADS_GID" -m -s /bin/bash freeflix 2>/dev/null || true
 
-  # Set up torra config and DB for the freeflix user
-  mkdir -p /home/freeflix/.config/torrra /home/freeflix/.local/share/torrra
-  cp "$HOME/.config/torrra/config.toml" /home/freeflix/.config/torrra/config.toml
-  ln -sf "$TORRA_DB" /home/freeflix/.local/share/torrra/torrra.db
-  chown -R "$DOWNLOADS_UID:$DOWNLOADS_GID" /home/freeflix /downloads /data
+  # Set up torra config and DB under a home dir for the non-root user
+  TORRA_HOME="/home/freeflix"
+  mkdir -p "$TORRA_HOME/.config/torrra" "$TORRA_HOME/.local/share/torrra"
+  cp "$HOME/.config/torrra/config.toml" "$TORRA_HOME/.config/torrra/config.toml"
+  ln -sf "$TORRA_DB" "$TORRA_HOME/.local/share/torrra/torrra.db"
+  chown -R "$DOWNLOADS_UID:$DOWNLOADS_GID" "$TORRA_HOME" /downloads /data
 
-  TORRA_RUN="gosu freeflix"
-  echo "[freeflix] Torra will run as user freeflix ($DOWNLOADS_UID:$DOWNLOADS_GID)"
+  # Use numeric UID:GID with gosu (no /etc/passwd entry needed)
+  TORRA_RUN="gosu $DOWNLOADS_UID:$DOWNLOADS_GID env HOME=$TORRA_HOME"
+  echo "[freeflix] Torra will run as UID=$DOWNLOADS_UID GID=$DOWNLOADS_GID"
 else
   TORRA_RUN=""
   echo "[freeflix] Downloads directory owned by root, Torra will run as root"
