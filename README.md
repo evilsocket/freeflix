@@ -6,10 +6,6 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue?logo=docker&style=flat-square)](https://github.com/evilsocket/freeflix)
 ![AI Powered](https://img.shields.io/badge/AI-powered-blueviolet?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS1wZXJzb24tc3RhbmRpbmctaWNvbiBsdWNpZGUtcGVyc29uLXN0YW5kaW5nIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjUiIHI9IjEiLz48cGF0aCBkPSJtOSAyMCAzLTYgMyA2Ii8+PHBhdGggZD0ibTYgOCA2IDIgNi0yIi8+PHBhdGggZD0iTTEyIDEwdjQiLz48L3N2Zz4=)
 
-<br/>
-
-<img src="https://img.shields.io/badge/Jackett-Indexer-orange?style=for-the-badge" /> <img src="https://img.shields.io/badge/Torra-Downloader-green?style=for-the-badge" /> <img src="https://img.shields.io/badge/OpenCode-Agent-blueviolet?style=for-the-badge" /> <img src="https://img.shields.io/badge/Trakt-Optional-grey?style=for-the-badge" />
-
 </div>
 
 Freeflix is an AI-powered movie and TV show discovery and download system, packaged as a single Docker container. Talk to an AI agent that searches for content, recommends titles based on your taste, and queues downloads — all from your terminal.
@@ -102,35 +98,6 @@ After editing, rebuild your image:
 
 ```bash
 docker build -t freeflix .
-```
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Docker Container "freeflix"                                  │
-│                                                              │
-│  ┌──────────┐                                                │
-│  │ Jackett   │ ← background process, port 9117               │
-│  │ TPB,1337x │   API: /api/v2.0/indexers/all/results         │
-│  └─────┬────┘                                                │
-│        │ curl (from OpenCode bash tool)                      │
-│        ▼                                                     │
-│  ┌──────────────────────────────────────────────────────┐    │
-│  │ OpenCode Agent — tmux session "main"                  │    │
-│  │ Bash tools: curl → Jackett, sqlite3 → Torra DB        │    │
-│  │ MCP: Trakt (optional, for taste profiling)            │    │
-│  └──────────┬───────────────────────────────────────────┘    │
-│             │ sqlite3 INSERT into torrents table              │
-│             ▼                                                │
-│  ┌──────────────────────┐                                    │
-│  │ Torra TUI             │ ← tmux session "torra"            │
-│  │ Reads SQLite DB       │   Theme: dracula                  │
-│  │ Downloads → /downloads │                                   │
-│  └──────────────────────┘                                    │
-│                                                              │
-│  /downloads ──► host $(pwd) via bind mount                   │
-└──────────────────────────────────────────────────────────────┘
 ```
 
 ## What the Agent Can Do
