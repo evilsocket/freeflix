@@ -79,8 +79,8 @@ torrra config set general.download_path /downloads
 torrra config set general.theme dracula
 
 # Patch torrra to default to Downloads view instead of Search
-find /usr/local/lib -path "*/torrra/*" -name "*.py" -exec \
-  sed -i 's/initial="search_content"/initial="downloads_content"/' {} + 2>/dev/null || true
+find /usr/local/lib -path "*/torrra/screens/home.py" -exec \
+  sed -i 's/"downloads_content" if self.direct_download else "search_content"/"downloads_content"/' {} + 2>/dev/null || true
 echo "[freeflix] Patched Torra default view to Downloads"
 
 # ── 5. Set up persistent Torra SQLite DB ──
@@ -223,9 +223,31 @@ echo "[freeflix] Launching tmux sessions..."
 tmux new-session -d -s torra \
   "$TORRA_RUN $TORRRA_BIN jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY; echo '[freeflix] Torra exited. Press enter for shell.'; read; exec bash"
 
-# OpenCode agent session (resumes last session if available)
-tmux new-session -d -s main \
-  "cd /work && $OPENCODE_BIN $OPENCODE_RESUME; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
+# ── 12. Optionally start Telegram bot ──
+if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+  echo "[freeflix] Starting Telegram bot..."
+  tmux new-session -d -s telegram \
+    "python3 /opt/freeflix/config/telegram_bot.py; echo '[freeflix] Telegram bot exited. Press enter for shell.'; read; exec bash"
+fi
+
+# ── 13. Launch OpenCode ──
+if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+  # Server mode: allows both TUI and Telegram bot to share the same session
+  echo "[freeflix] Telegram enabled, starting OpenCode in server mode..."
+  tmux new-session -d -s opencode-server \
+    "cd /work && $OPENCODE_BIN serve $OPENCODE_RESUME; echo '[freeflix] OpenCode server exited. Press enter for shell.'; read; exec bash"
+
+  # Give the server a moment to start
+  sleep 2
+
+  # TUI attaches to the running server
+  tmux new-session -d -s main \
+    "cd /work && $OPENCODE_BIN attach; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
+else
+  # Direct mode: plain TUI, no server needed
+  tmux new-session -d -s main \
+    "cd /work && $OPENCODE_BIN $OPENCODE_RESUME; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
+fi
 
 # Give sessions a moment to initialize
 sleep 1
@@ -240,7 +262,11 @@ fi
 echo ""
 echo "[freeflix] Ready! Attaching to OpenCode session..."
 echo "[freeflix] Sessions: Ctrl-b Left/Right to switch"
-echo "[freeflix]   <- jackett | torra | main (opencode) ->"
+if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+  echo "[freeflix]   <- jackett | torra | telegram | main (opencode) ->"
+else
+  echo "[freeflix]   <- jackett | torra | main (opencode) ->"
+fi
 echo ""
 
 # Attach to the main OpenCode session

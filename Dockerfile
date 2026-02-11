@@ -49,6 +49,9 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
       ln -sf "$OPENCODE_BIN" /usr/local/bin/opencode; \
     fi
 
+# Telegram bot (optional, activated by TELEGRAM_BOT_TOKEN env var)
+RUN pip3 install --break-system-packages python-telegram-bot
+
 # Trakt MCP Server
 RUN git clone https://github.com/wwiens/trakt_mcpserver /opt/trakt_mcpserver && \
     pip3 install --break-system-packages -r /opt/trakt_mcpserver/requirements.txt

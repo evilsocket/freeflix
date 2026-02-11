@@ -8,7 +8,7 @@
 
 </div>
 
-Freeflix is an AI-powered movie and TV show discovery and download system, packaged as a single Docker container. Talk to an AI agent that searches for content, recommends titles based on your taste, and queues downloads — all from your terminal.
+Freeflix is an AI-powered media discovery and download system, packaged as a single Docker container. Talk to an AI agent that searches for content, recommends titles based on your taste, and queues downloads — from your terminal or via Telegram.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -39,17 +39,18 @@ Freeflix orchestrates four components inside a single container:
 - **[OpenCode](https://opencode.ai/)** — AI coding agent repurposed as a conversational movie assistant. Uses a custom system prompt with full operational instructions for searching, downloading, and managing torrents.
 - **[Trakt MCP Server](https://github.com/wwiens/trakt_mcpserver)** *(optional)* — When Trakt credentials are provided, the agent uses your watch history and ratings as ground truth to build a taste profile, avoid re-recommending watched content, and personalize suggestions.
 
-Three tmux sessions are available, navigable with `Ctrl-b Left/Right`:
+Tmux sessions are available, navigable with `Ctrl-b Left/Right`:
 
 | Session | Content |
 |---------|---------|
 | `jackett` | Jackett indexer logs |
 | `torra` | Torra download TUI |
+| `telegram` | Telegram bot logs *(only when `TELEGRAM_BOT_TOKEN` is set)* |
 | `main` | OpenCode AI agent (attached by default) |
 
 ```
-  Ctrl-b Left                    Ctrl-b Right
-  <────────── jackett | torra | main ──────────>
+  Ctrl-b Left                                        Ctrl-b Right
+  <────────── jackett | torra | [telegram] | main ──────────>
 ```
 
 ## Quick Start
@@ -74,6 +75,8 @@ Downloads will appear in your current working directory.
 | `OPENAI_API_KEY` | — | If set, auto-switches model to `openai/gpt-4o` |
 | `TRAKT_CLIENT_ID` | — | Enables Trakt MCP for personalized recommendations |
 | `TRAKT_CLIENT_SECRET` | — | Enables Trakt MCP for personalized recommendations |
+| `TELEGRAM_BOT_TOKEN` | — | Bot token from [@BotFather](https://t.me/BotFather). Enables Telegram interface. |
+| `TELEGRAM_ALLOWED_USERS` | — | Comma-separated Telegram user IDs allowed to use the bot |
 
 ### Examples
 
@@ -98,6 +101,47 @@ docker run -it --rm --name freeflix \
   freeflix
 ```
 
+**With Telegram bot**:
+
+```bash
+docker run -it --rm --name freeflix \
+  -e ANTHROPIC_API_KEY="sk-..." \
+  -e TELEGRAM_BOT_TOKEN="123456:ABC-DEF..." \
+  -e TELEGRAM_ALLOWED_USERS="12345678" \
+  -v "$(pwd):/downloads" \
+  -v "$HOME/.freeflix:/data" \
+  freeflix
+```
+
+## Telegram Bot
+
+Freeflix can optionally be controlled via Telegram. When `TELEGRAM_BOT_TOKEN` is set, OpenCode switches to **server mode** — the terminal TUI and Telegram bot share the same AI session and conversation context.
+
+### Setup
+
+1. Message [@BotFather](https://t.me/BotFather) on Telegram and create a new bot with `/newbot`
+2. Copy the bot token
+3. Get your Telegram user ID — message [@userinfobot](https://t.me/userinfobot) or start the Freeflix bot and it will show your ID in the "Unauthorized" response
+4. Pass both as environment variables when running the container:
+
+```bash
+-e TELEGRAM_BOT_TOKEN="123456:ABC-DEF..."
+-e TELEGRAM_ALLOWED_USERS="12345678,87654321"
+```
+
+`TELEGRAM_ALLOWED_USERS` is a comma-separated list of numeric Telegram user IDs. If empty or unset, all users are denied.
+
+### Usage
+
+Send any text message to your bot — it gets forwarded to the AI agent and the response is sent back. Examples:
+
+- *"Find me a good sci-fi movie"*
+- *"Download The Matrix 1999"*
+- *"What's downloading right now?"*
+- *"Get me Neuromancer ebook"*
+
+The `/start` command shows your user ID and usage examples.
+
 ## Customization
 
 All configuration lives in the `config/` folder and can be edited before building:
@@ -117,14 +161,15 @@ docker build -t freeflix .
 
 The Freeflix agent understands how to:
 
-- **Search** movies and TV shows via Jackett's Torznab API (`curl`)
+- **Search** movies, TV shows, ebooks, audiobooks, music, comics, and more via Jackett
 - **Queue downloads** by inserting into Torra's SQLite database
 - **Check download status** via the `is_notified` flag (0 = downloading, 1 = complete)
 - **Pause/resume/cancel** downloads by updating database rows
-- **List completed files** in `/downloads`
+- **Detect duplicates** before downloading (checks `/downloads`, Torra DB, and Trakt history)
+- **Filter unsafe torrents** — skips results with suspicious extensions, abnormal sizes, or malware indicators
 - **Recommend content** based on your Trakt watch history and ratings (if configured)
 - **Build a taste profile** from your Trakt data to suggest content you'll actually enjoy
-- **Avoid re-recommending** things you've already watched
+- **Respond via Telegram** when the bot is configured
 
 ## License
 
