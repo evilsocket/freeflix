@@ -70,29 +70,41 @@ def split_message(text: str, max_len: int = TELEGRAM_MAX_LEN) -> list[str]:
     return chunks
 
 
+async def _exec_opencode(prompt: str, use_continue: bool) -> tuple[int, str]:
+    cmd = ["opencode", "run", "--attach", "http://localhost:4096"]
+    if use_continue:
+        cmd.append("--continue")
+    cmd.append(prompt)
+    log.info("Running: %s", " ".join(cmd))
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        cwd="/work",
+    )
+    try:
+        stdout, _ = await asyncio.wait_for(
+            proc.communicate(), timeout=OPENCODE_TIMEOUT
+        )
+    except asyncio.TimeoutError:
+        log.warning("OpenCode timed out after %ds, killing process", OPENCODE_TIMEOUT)
+        proc.kill()
+        await proc.wait()
+        return 1, "[Timeout] OpenCode did not respond within 5 minutes."
+
+    output = stdout.decode("utf-8", errors="replace").strip()
+    output = strip_ansi(output)
+    log.info("OpenCode exited with code %d, output length: %d chars", proc.returncode, len(output))
+    return proc.returncode, output
+
+
 async def run_opencode(prompt: str) -> str:
     async with opencode_lock:
-        log.info("Running: opencode run --attach http://localhost:4096 %r", prompt)
-        proc = await asyncio.create_subprocess_exec(
-            "opencode", "run", "--attach", "http://localhost:4096", "--continue", prompt,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            cwd="/work",
-        )
-        try:
-            stdout, _ = await asyncio.wait_for(
-                proc.communicate(), timeout=OPENCODE_TIMEOUT
-            )
-        except asyncio.TimeoutError:
-            log.warning("OpenCode timed out after %ds, killing process", OPENCODE_TIMEOUT)
-            proc.kill()
-            await proc.wait()
-            return "[Timeout] OpenCode did not respond within 5 minutes."
-
-        log.info("OpenCode exited with code %d", proc.returncode)
-        output = stdout.decode("utf-8", errors="replace").strip()
-        output = strip_ansi(output)
-        log.info("Output length: %d chars", len(output))
+        # Try continuing the last session; if none exists, create a new one
+        rc, output = await _exec_opencode(prompt, use_continue=True)
+        if rc != 0:
+            log.info("--continue failed (rc=%d), retrying without it", rc)
+            rc, output = await _exec_opencode(prompt, use_continue=False)
         if not output:
             return "[No response from OpenCode]"
         return output
