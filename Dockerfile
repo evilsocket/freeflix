@@ -47,7 +47,7 @@ RUN pip3 install --break-system-packages --ignore-installed torrra
 RUN curl -fsSL https://opencode.ai/install | bash && \
     OPENCODE_BIN=$(find /root /usr/local -name opencode -type f 2>/dev/null | head -1) && \
     if [ -n "$OPENCODE_BIN" ] && [ "$OPENCODE_BIN" != "/usr/local/bin/opencode" ]; then \
-      ln -sf "$OPENCODE_BIN" /usr/local/bin/opencode; \
+    ln -sf "$OPENCODE_BIN" /usr/local/bin/opencode; \
     fi
 
 # Telegram bot (optional, activated by TELEGRAM_BOT_TOKEN env var)
@@ -65,6 +65,7 @@ RUN mkdir -p /work /downloads /data /config/jackett
 
 # Config files (changes here only rebuild from this line)
 COPY config/ /opt/freeflix/config/
+COPY bin/ /opt/freeflix/bin/
 
 # Entrypoint (changes here only rebuild this line)
 COPY entrypoint.sh /opt/freeflix/entrypoint.sh

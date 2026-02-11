@@ -244,7 +244,7 @@ tmux new-window -t freeflix -n torra \
 if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   echo "[freeflix] Starting Telegram bot..."
   tmux new-window -t freeflix -n telegram \
-    "python3 /opt/freeflix/config/telegram_bot.py; echo '[freeflix] Telegram bot exited. Press enter for shell.'; read; exec bash"
+    "python3 /opt/freeflix/bin/telegram_bot.py; echo '[freeflix] Telegram bot exited. Press enter for shell.'; read; exec bash"
 fi
 
 # ── 13. Launch OpenCode ──

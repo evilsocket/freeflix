@@ -67,39 +67,64 @@ _STATUS_LINE_RE = re.compile(r"^> \S+ · ")
 def format_for_telegram(raw: str) -> str:
     """Separate tool calls from assistant text.
 
-    Tool call blocks become expandable blockquotes in MarkdownV2.
-    Assistant text is converted via telegramify_markdown.
+    Tool call blocks (including their output) become expandable blockquotes
+    in MarkdownV2. Assistant text is converted via telegramify_markdown.
     """
     lines = raw.split("\n")
-    sections: list[tuple[str, list[str]]] = []  # ("tool"|"text", lines)
-    current_type = "text"
-    current: list[str] = []
 
-    for line in lines:
-        # Strip status lines (e.g. "> build · kimi-k2.5-free")
+    # First pass: find indices of all tool call lines ($ or ⚙)
+    tool_line_indices = set()
+    for i, line in enumerate(lines):
+        if _TOOL_LINE_RE.match(line):
+            tool_line_indices.add(i)
+
+    # Second pass: mark each line as "tool", "status" (skip), or "text".
+    # Lines between tool calls are tool output. After the LAST tool call,
+    # only the final paragraph (after a blank line) is assistant text.
+    labels: list[str] = []  # "tool", "text", or "skip"
+    in_tool = False
+
+    for i, line in enumerate(lines):
         if _STATUS_LINE_RE.match(line):
+            labels.append("skip")
             continue
 
-        is_tool = bool(_TOOL_LINE_RE.match(line))
-
-        if is_tool and current_type != "tool":
-            # Flush text section, start tool section
-            if current:
-                sections.append(("text", current))
-            current = [line]
-            current_type = "tool"
-        elif not is_tool and current_type == "tool":
-            # Flush tool section, start text section
-            if current:
-                sections.append(("tool", current))
-            current = [line]
-            current_type = "text"
+        if i in tool_line_indices:
+            in_tool = True
+            labels.append("tool")
+        elif in_tool:
+            # Check if there are more tool calls ahead
+            has_more_tools = any(j > i for j in tool_line_indices)
+            if has_more_tools:
+                # Between tool calls — this is tool output
+                labels.append("tool")
+            else:
+                # After the last tool call. Tool output continues until
+                # we hit a blank line, then the rest is assistant text.
+                # Look backwards: was there a blank line between last tool and here?
+                last_tool = max(j for j in tool_line_indices if j <= i)
+                preceding = lines[last_tool + 1:i]
+                if any(l.strip() == "" for l in preceding) and line.strip() != "":
+                    # We're past a blank separator after the last tool output
+                    in_tool = False
+                    labels.append("text")
+                else:
+                    labels.append("tool")
         else:
-            current.append(line)
+            labels.append("text")
 
-    if current:
-        sections.append((current_type, current))
+    # Third pass: group consecutive same-label lines into sections
+    sections: list[tuple[str, list[str]]] = []
+    for i, line in enumerate(lines):
+        label = labels[i]
+        if label == "skip":
+            continue
+        if sections and sections[-1][0] == label:
+            sections[-1][1].append(line)
+        else:
+            sections.append((label, [line]))
 
+    # Fourth pass: render sections
     parts: list[str] = []
     for stype, slines in sections:
         text = "\n".join(slines).strip()
