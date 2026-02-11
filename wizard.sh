@@ -59,7 +59,10 @@ ask_yn() {
   echo -en "  ${prompt} ${DIM}[${hint}]${RESET}: "
   read -r answer
   answer="${answer:-$default}"
-  [[ "${answer,,}" == "y"* ]]
+  case "$answer" in
+    [yY]*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Build docker command from env vars
