@@ -6,7 +6,7 @@ trap 'tmux kill-server 2>/dev/null; exit 0' EXIT INT TERM
 
 cat /opt/freeflix/config/ascii_logo.txt 2>/dev/null || true
 echo ""
-echo "  freeflix v${FREEFLIX_VERSION:-1.0.0}"
+echo "  freeflix v${FREEFLIX_VERSION:-1.0.0b}"
 echo ""
 echo "[freeflix] Starting services..."
 
