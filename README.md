@@ -4,60 +4,95 @@
 
 [![License](https://img.shields.io/badge/license-GPL3-brightgreen.svg?style=flat-square)](https://github.com/evilsocket/freeflix/blob/master/LICENSE.md)
 [![Docker](https://img.shields.io/badge/docker-ready-blue?logo=docker&style=flat-square)](https://github.com/evilsocket/freeflix)
-![AI Powered](https://img.shields.io/badge/AI-powered-blueviolet?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBjbGFzcz0ibHVjaWRlIGx1Y2lkZS1wZXJzb24tc3RhbmRpbmctaWNvbiBsdWNpZGUtcGVyc29uLXN0YW5kaW5nIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjUiIHI9IjEiLz48cGF0aCBkPSJtOSAyMCAzLTYgMyA2Ii8+PHBhdGggZD0ibTYgOCA2IDIgNi0yIi8+PHBhdGggZD0iTTEyIDEwdjQiLz48L3N2Zz4=)
+
+**AI-powered media discovery and download system.**
+
+Talk to an AI that searches for movies, TV shows, music, ebooks and more, then queues downloads — from your terminal or via Telegram.
 
 </div>
 
-Freeflix is an AI-powered media discovery and download system, packaged as a single Docker container. Talk to an AI agent that searches for content, recommends titles based on your taste, and queues downloads — from your terminal or via Telegram.
+## Setup
 
-```
-┌──────────────────────────────────────────────────────┐
-│                                                      │
-│   "Find me something like Blade Runner"              │
-│                                                      │
-│   > Searching Jackett for sci-fi noir...             │
-│   > Found 12 results. Here are the best:             │
-│                                                      │
-│   # │ Title                        │ Quality │ Seeds │
-│   1 │ Blade Runner 2049 (2017)     │ 1080p   │ 847   │
-│   2 │ Dark City (1998)             │ 1080p   │ 234   │
-│   3 │ Ghost in the Shell (1995)    │ 1080p   │ 156   │
-│                                                      │
-│   "Download #1"                                      │
-│                                                      │
-│   > Queued! Check Torra TUI for progress (Ctrl-b Left/Right   │
-│                                                      │
-└──────────────────────────────────────────────────────┘
+Run the setup wizard:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh | bash
 ```
 
-## How It Works
+The wizard will:
 
-Freeflix orchestrates four components inside a single container:
+1. Check that Docker is installed and running.
+2. Walk you through configuring the LLM provider, Trakt, Telegram and downloads directory.
+3. Save your config to `~/.freeflix/.env`.
+4. Optionally install a `freeflix` command in your PATH so you can start it anytime.
+5. Pull the Docker image and start the container.
 
-- **[Jackett](https://github.com/Jackett/Jackett)** — Torrent indexer proxy with ThePirateBay, 1337x, and UIndex pre-enabled. The AI agent queries its Torznab API via `curl` to search for content.
-- **[Torra](https://github.com/stabldev/torrra)** — Torrent downloader with a TUI. The agent queues downloads by writing directly to Torra's SQLite database — the TUI reactively picks them up.
-- **[OpenCode](https://opencode.ai/)** — AI coding agent repurposed as a conversational movie assistant. Uses a custom system prompt with full operational instructions for searching, downloading, and managing torrents.
-- **[Trakt MCP Server](https://github.com/wwiens/trakt_mcpserver)** *(optional)* — When Trakt credentials are provided, the agent uses your watch history and ratings as ground truth to build a taste profile, avoid re-recommending watched content, and personalize suggestions.
+On subsequent runs, the wizard loads your saved config and starts immediately. To reconfigure, decline the quick-start prompt and the wizard will walk you through the options again.
 
-A clickable tab bar at the bottom lets you switch between services (mouse enabled). You can also use `Ctrl-b Left/Right`:
+## Usage
 
-| Tab | Content |
-|-----|---------|
-| `jackett` | Jackett indexer logs |
-| `torra` | Torra download TUI |
-| `telegram` | Telegram bot logs *(only when `TELEGRAM_BOT_TOKEN` is set)* |
-| `opencode` | OpenCode AI agent (selected by default) |
+Once the container starts you'll see a tabbed terminal interface:
 
 ```
   ┌─────────────────────────────────────────┐
   │  OpenCode AI agent                      │
-  │  ...                                    │
+  │                                         │
+  │  > "Find me something like Blade Runner"│
+  │                                         │
   ├─────────────────────────────────────────┤
   │  jackett │ torra │ telegram │ opencode  │
   └─────────────────────────────────────────┘
 ```
 
-## Quick Start
+Click the tabs at the bottom or use **Ctrl-b Left/Right** to switch between:
+
+- **jackett** — torrent indexer logs
+- **torra** — download manager TUI
+- **telegram** — Telegram bot logs *(only when enabled)*
+- **opencode** — AI agent chat *(selected by default)*
+
+Just type naturally. Some examples:
+
+- *"Find me a good sci-fi movie"*
+- *"Download The Matrix in 1080p"*
+- *"What's downloading right now?"*
+- *"Get me the Neuromancer audiobook"*
+- *"Recommend something based on my Trakt history"*
+
+## Telegram
+
+When enabled via the wizard, you can also chat with the AI through a Telegram bot. The bot and terminal share the same session, so you can switch between them freely.
+
+To set it up you'll need a bot token from [@BotFather](https://t.me/BotFather) and your numeric user ID (message [@userinfobot](https://t.me/userinfobot) to get it).
+
+## How It Works
+
+Freeflix orchestrates several components inside a single container:
+
+- **[Jackett](https://github.com/Jackett/Jackett)** — torrent indexer proxy (ThePirateBay, 1337x, YTS, KickassTorrents, TheRARBG pre-configured)
+- **[Torra](https://github.com/stabldev/torrra)** — torrent downloader with a TUI
+- **[OpenCode](https://opencode.ai/)** — AI agent with a custom system prompt for media search and download
+- **[Trakt MCP](https://github.com/wwiens/trakt_mcpserver)** *(optional)* — personalized recommendations from your watch history
+
+## Configuration
+
+All settings are stored in `~/.freeflix/.env` (created by the wizard). You can edit this file directly or re-run the wizard.
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Use Claude as the LLM |
+| `OPENAI_API_KEY` | Use GPT-4o as the LLM |
+| `OPENCODE_MODEL` | Custom model name (e.g. `provider/model`) |
+| `OPENCODE_API_KEY` | API key for custom model |
+| `TRAKT_CLIENT_ID` | Trakt app client ID ([create one here](https://trakt.tv/oauth/applications)) |
+| `TRAKT_CLIENT_SECRET` | Trakt app client secret |
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs |
+| `DOWNLOADS_DIR` | Host directory for downloads |
+
+If no LLM key is provided, the free [OpenCode Zen](https://opencode.ai/zen) tier is used.
+
+## Building from Source
 
 ```bash
 docker build -t freeflix .
@@ -67,113 +102,16 @@ docker run -it --rm --name freeflix \
   freeflix
 ```
 
-Downloads will appear in your current working directory.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENCODE_MODEL` | `opencode/kimi-k2.5-free` | LLM model to use ([OpenCode Zen](https://opencode.ai/zen) free tier) |
-| `OPENCODE_API_KEY` | — | OpenCode Zen API key |
-| `ANTHROPIC_API_KEY` | — | If set, auto-switches model to `anthropic/claude-sonnet-4-5` |
-| `OPENAI_API_KEY` | — | If set, auto-switches model to `openai/gpt-4o` |
-| `TRAKT_CLIENT_ID` | — | Enables Trakt MCP for personalized recommendations |
-| `TRAKT_CLIENT_SECRET` | — | Enables Trakt MCP for personalized recommendations |
-| `TELEGRAM_BOT_TOKEN` | — | Bot token from [@BotFather](https://t.me/BotFather). Enables Telegram interface. |
-| `TELEGRAM_ALLOWED_USERS` | — | Comma-separated Telegram user IDs allowed to use the bot |
-
-### Examples
-
-**Minimal** — uses OpenCode Zen free tier, no Trakt:
-
-```bash
-docker run -it --rm --name freeflix \
-  -v "$(pwd):/downloads" \
-  -v "$HOME/.freeflix:/data" \
-  freeflix
-```
-
-**With Anthropic and Trakt**:
-
-```bash
-docker run -it --rm --name freeflix \
-  -e ANTHROPIC_API_KEY="sk-..." \
-  -e TRAKT_CLIENT_ID="your_client_id" \
-  -e TRAKT_CLIENT_SECRET="your_client_secret" \
-  -v "$(pwd):/downloads" \
-  -v "$HOME/.freeflix:/data" \
-  freeflix
-```
-
-**With Telegram bot**:
-
-```bash
-docker run -it --rm --name freeflix \
-  -e ANTHROPIC_API_KEY="sk-..." \
-  -e TELEGRAM_BOT_TOKEN="123456:ABC-DEF..." \
-  -e TELEGRAM_ALLOWED_USERS="12345678" \
-  -v "$(pwd):/downloads" \
-  -v "$HOME/.freeflix:/data" \
-  freeflix
-```
-
-## Telegram Bot
-
-Freeflix can optionally be controlled via Telegram. When `TELEGRAM_BOT_TOKEN` is set, OpenCode switches to **server mode** — the terminal TUI and Telegram bot share the same AI session and conversation context.
-
-### Setup
-
-1. Message [@BotFather](https://t.me/BotFather) on Telegram and create a new bot with `/newbot`
-2. Copy the bot token
-3. Get your Telegram user ID — message [@userinfobot](https://t.me/userinfobot) or start the Freeflix bot and it will show your ID in the "Unauthorized" response
-4. Pass both as environment variables when running the container:
-
-```bash
--e TELEGRAM_BOT_TOKEN="123456:ABC-DEF..."
--e TELEGRAM_ALLOWED_USERS="12345678,87654321"
-```
-
-`TELEGRAM_ALLOWED_USERS` is a comma-separated list of numeric Telegram user IDs. If empty or unset, all users are denied.
-
-### Usage
-
-Send any text message to your bot — it gets forwarded to the AI agent and the response is sent back. Examples:
-
-- *"Find me a good sci-fi movie"*
-- *"Download The Matrix 1999"*
-- *"What's downloading right now?"*
-- *"Get me Neuromancer ebook"*
-
-The `/start` command shows your user ID and usage examples.
+Pass `-e VAR=value` flags for any configuration variables listed above.
 
 ## Customization
 
-All configuration lives in the `config/` folder and can be edited before building:
-
 | File | What to customize |
 |------|-------------------|
-| `config/AGENT_PROMPT.md` | Agent personality, behavior, tool instructions, search/download templates |
-| `config/opencode.json` | Theme, additional MCP servers, OpenCode settings |
+| `config/AGENT_PROMPT.md` | Agent personality, search/download behavior |
+| `config/opencode.json` | Theme, MCP servers, OpenCode settings |
 
-After editing, rebuild your image:
-
-```bash
-docker build -t freeflix .
-```
-
-## What the Agent Can Do
-
-The Freeflix agent understands how to:
-
-- **Search** movies, TV shows, ebooks, audiobooks, music, comics, and more via Jackett
-- **Queue downloads** by inserting into Torra's SQLite database
-- **Check download status** via the `is_notified` flag (0 = downloading, 1 = complete)
-- **Pause/resume/cancel** downloads by updating database rows
-- **Detect duplicates** before downloading (checks `/downloads`, Torra DB, and Trakt history)
-- **Filter unsafe torrents** — skips results with suspicious extensions, abnormal sizes, or malware indicators
-- **Recommend content** based on your Trakt watch history and ratings (if configured)
-- **Build a taste profile** from your Trakt data to suggest content you'll actually enjoy
-- **Respond via Telegram** when the bot is configured
+Rebuild the image after editing: `docker build -t freeflix .`
 
 ## License
 
