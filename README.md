@@ -7,22 +7,24 @@
 
 **AI-powered media discovery and download system.**
 
-Talk to an AI that searches for movies, TV shows, music, ebooks and more, then queues downloads — from your terminal or via Telegram.
+Talk to an AI that searches for movies, TV shows, music, ebooks and more, then queues downloads — from your terminal or via Telegram. Works out of the box with no registration or API keys required.
 
 </div>
 
 ## Setup
 
-Run the setup wizard:
+All you need is Docker. Run the setup wizard:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh | bash
 ```
 
+That's it. No accounts, no API keys, no registration — by default Freeflix uses the free [OpenCode Zen](https://opencode.ai/zen) LLM tier which requires no sign-up. Just run the command and start chatting.
+
 The wizard will:
 
 1. Check that Docker is installed and running.
-2. Walk you through configuring the LLM provider, Trakt, Telegram and downloads directory.
+2. Walk you through optional features (bring-your-own LLM key, Trakt, Telegram).
 3. Save your config to `~/.freeflix/.env`.
 4. Optionally install a `freeflix` command in your PATH so you can start it anytime.
 5. Pull the Docker image and start the container.
@@ -58,6 +60,21 @@ Just type naturally. Some examples:
 - *"What's downloading right now?"*
 - *"Get me the Neuromancer audiobook"*
 - *"Recommend something based on my Trakt history"*
+
+## Personalized Recommendations with Trakt
+
+Out of the box, Freeflix relies on the AI's general knowledge to suggest content. But if you connect your [Trakt](https://trakt.tv) account, it becomes a personalized system that learns your taste.
+
+Trakt is a free service that tracks what you watch and rate. When you provide your Trakt credentials (via the wizard), Freeflix gains access to your full watch history and ratings through the [Trakt MCP server](https://github.com/wwiens/trakt_mcpserver). This means the AI can:
+
+- Build a taste profile from what you've watched and how you rated it.
+- Avoid recommending things you've already seen.
+- Find content that matches patterns in your history — not just generic "top 10" lists.
+- Get better over time as your Trakt history grows.
+
+To set it up, create a free Trakt API app at [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications) and provide the Client ID and Secret when the wizard asks. On first run, you'll be prompted to authorize your Trakt account via a PIN code.
+
+This is entirely optional — Freeflix works fine without it.
 
 ## Telegram
 
