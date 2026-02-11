@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Freeflix Setup Wizard
-# Usage: curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh | bash
+# Usage: bash <(curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh)
 set -euo pipefail
 
 # When piped from curl, stdin is consumed — read user input from /dev/tty
@@ -151,7 +151,7 @@ ENV_FILE="$HOME/.freeflix/.env"
 if [ ! -f "$ENV_FILE" ]; then
   echo "No config found at $ENV_FILE" >&2
   echo "Run the setup wizard first:" >&2
-  echo "  curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh | bash" >&2
+  echo "  bash <(curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh)" >&2
   exit 1
 fi
 

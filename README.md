@@ -23,7 +23,7 @@ Talk to an AI that searches for movies, TV shows, music, ebooks and more, then q
 All you need is Docker. Run the setup wizard:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh | bash
+bash <(curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh)
 ```
 
 That's it. No accounts, no API keys, no registration — by default Freeflix uses the free OpenCode Zen tier which requires no sign-up. Just run the command and start chatting.
