@@ -94,10 +94,6 @@ torrra config set indexers.default jackett
 torrra config set general.download_path /downloads
 torrra config set general.theme dracula
 
-# Patch torrra to default to Downloads view instead of Search
-find /usr/local/lib -path "*/torrra/screens/home.py" -exec \
-  sed -i 's/"downloads_content" if self.direct_download else "search_content"/"downloads_content"/' {} + 2>/dev/null || true
-echo "[freeflix] Patched Torra default view to Downloads"
 
 # ── 5. Set up persistent Torra SQLite DB ──
 # /data is a dedicated volume mounted to ~/.freeflix on the host
