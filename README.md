@@ -11,6 +11,10 @@ Talk to an AI that searches for movies, TV shows, music, ebooks and more, then q
 
 </div>
 
+<div align="center">
+  <video src="https://github.com/evilsocket/freeflix/raw/main/demo.mov" width="800"></video>
+</div>
+
 ## Quick Start
 
 All you need is Docker. Run the setup wizard:

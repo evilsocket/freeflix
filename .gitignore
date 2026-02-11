@@ -1,9 +1,6 @@
 # Downloads
 downloads/
 
-# Docker
-.dockerignore
-
 # IDE
 .vscode/
 .idea/
