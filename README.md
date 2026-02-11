@@ -41,7 +41,7 @@ On subsequent runs, the wizard loads your saved config and starts immediately. T
 To update to the latest version:
 
 ```bash
-docker pull ghcr.io/evilsocket/freeflix:latest
+freeflix update
 ```
 
 ## Usage

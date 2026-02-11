@@ -160,6 +160,12 @@ set -euo pipefail
 IMAGE="ghcr.io/evilsocket/freeflix:latest"
 ENV_FILE="$HOME/.freeflix/.env"
 
+if [ "${1:-}" = "update" ]; then
+  echo "Pulling latest freeflix image..."
+  docker pull "$IMAGE"
+  exit $?
+fi
+
 if [ ! -f "$ENV_FILE" ]; then
   echo "No config found at $ENV_FILE" >&2
   echo "Run the setup wizard first:" >&2
