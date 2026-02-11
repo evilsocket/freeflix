@@ -11,7 +11,7 @@ Talk to an AI that searches for movies, TV shows, music, ebooks and more, then q
 
 </div>
 
-## Setup
+## Quick Start
 
 All you need is Docker. Run the setup wizard:
 
@@ -121,15 +121,8 @@ docker run -it --rm --name freeflix \
 
 Pass `-e VAR=value` flags for any configuration variables listed above.
 
-## Customization
-
-| File | What to customize |
-|------|-------------------|
-| `config/AGENT_PROMPT.md` | Agent personality, search/download behavior |
-| `config/opencode.json` | Theme, MCP servers, OpenCode settings |
-
-Rebuild the image after editing: `docker build -t freeflix .`
-
 ## License
 
 Freeflix is released under the GPL 3 license.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=evilsocket/freeflix&type=Timeline)](https://www.star-history.com/#evilsocket/freeflix&Timeline)
