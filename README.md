@@ -12,8 +12,7 @@ Talk to an AI that searches for movies, TV shows, music, ebooks and more, then q
 </div>
 
 <p align="center">
-  VIDEO HERE
-  <video src="https://github.com/evilsocket/freeflix/raw/main/demo.mov" width="800"></video>
+  <video src="https://github.com/evilsocket/freeflix/raw/refs/heads/main/demo.mov" width="800"></video>
 </p>
 
 ## Quick Start
