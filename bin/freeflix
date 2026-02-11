@@ -6,4 +6,4 @@ docker run -it --rm --name freeflix \
   -e TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN \
   -v "$(pwd):/downloads" \
   -v "$HOME/.freeflix:/data" \
-  freeflix
+    ghcr.io/evilsocket/freeflix

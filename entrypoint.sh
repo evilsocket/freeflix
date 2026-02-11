@@ -36,7 +36,7 @@ echo "[freeflix] Pre-configuring Jackett indexers..."
 mkdir -p /config/jackett/Indexers
 
 # For public indexers, Jackett just needs the config file to exist with an empty array
-for indexer in thepiratebay 1337x yts; do
+for indexer in thepiratebay 1337x yts kickasstorrents-to therarbg; do
   echo "[]" > "/config/jackett/Indexers/$indexer.json"
   echo "[freeflix]   + $indexer pre-configured"
 done
@@ -77,7 +77,7 @@ if [ -n "$CONFIGURED" ]; then
 else
   echo "[freeflix]   ! No indexers loaded via pre-seed, trying API fallback..."
   # Fallback: enable via API
-  for indexer in thepiratebay 1337x yts uindex; do
+  for indexer in thepiratebay 1337x yts kickasstorrents-to therarbg uindex; do
     cfg=$(curl -sf "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" 2>/dev/null) || continue
     curl -sf -X POST "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" \
       -H "Content-Type: application/json" -d "$cfg" > /dev/null 2>&1 && \
