@@ -26,7 +26,7 @@ All you need is Docker. Run the setup wizard:
 curl -sSL https://raw.githubusercontent.com/evilsocket/freeflix/main/wizard.sh | bash
 ```
 
-That's it. No accounts, no API keys, no registration — by default Freeflix uses the free [OpenCode Zen](https://opencode.ai/zen) LLM tier which requires no sign-up. Just run the command and start chatting.
+That's it. No accounts, no API keys, no registration — by default Freeflix uses the free OpenCode Zen tier which requires no sign-up. Just run the command and start chatting.
 
 The wizard will:
 
