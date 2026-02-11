@@ -40,19 +40,6 @@ On subsequent runs, the wizard loads your saved config and starts immediately. T
 
 ## Usage
 
-Once the container starts you'll see a tabbed terminal interface:
-
-```
-  ┌─────────────────────────────────────────┐
-  │  OpenCode AI agent                      │
-  │                                         │
-  │  > "Find me something like Blade Runner"│
-  │                                         │
-  ├─────────────────────────────────────────┤
-  │  jackett │ torra │ telegram │ opencode  │
-  └─────────────────────────────────────────┘
-```
-
 Click the tabs at the bottom or use **Ctrl-b Left/Right** to switch between:
 
 - **jackett** — torrent indexer logs
