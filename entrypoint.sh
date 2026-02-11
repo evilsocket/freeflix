@@ -235,14 +235,11 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   # Server mode: allows both TUI and Telegram bot to share the same session
   echo "[freeflix] Telegram enabled, starting OpenCode in server mode..."
   tmux new-session -d -s opencode-server \
-    "cd /work && $OPENCODE_BIN serve $OPENCODE_RESUME; echo '[freeflix] OpenCode server exited. Press enter for shell.'; read; exec bash"
+    "cd /work && $OPENCODE_BIN serve --port 4096; echo '[freeflix] OpenCode server exited. Press enter for shell.'; read; exec bash"
 
-  # Give the server a moment to start
-  sleep 2
-
-  # TUI attaches to the running server
+  # TUI attaches to the running server (retry until server is ready)
   tmux new-session -d -s main \
-    "cd /work && $OPENCODE_BIN attach; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
+    "cd /work && echo '[freeflix] Waiting for OpenCode server...' && until $OPENCODE_BIN attach http://localhost:4096; do sleep 2; done; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
 else
   # Direct mode: plain TUI, no server needed
   tmux new-session -d -s main \

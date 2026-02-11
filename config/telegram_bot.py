@@ -70,8 +70,9 @@ def split_message(text: str, max_len: int = TELEGRAM_MAX_LEN) -> list[str]:
 
 async def run_opencode(prompt: str) -> str:
     async with opencode_lock:
+        log.info("Running: opencode run --attach http://localhost:4096 %r", prompt)
         proc = await asyncio.create_subprocess_exec(
-            "opencode", "run", "-p", prompt, "--attach",
+            "opencode", "run", "--attach", "http://localhost:4096", prompt,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd="/work",
@@ -81,12 +82,15 @@ async def run_opencode(prompt: str) -> str:
                 proc.communicate(), timeout=OPENCODE_TIMEOUT
             )
         except asyncio.TimeoutError:
+            log.warning("OpenCode timed out after %ds, killing process", OPENCODE_TIMEOUT)
             proc.kill()
             await proc.wait()
             return "[Timeout] OpenCode did not respond within 5 minutes."
 
+        log.info("OpenCode exited with code %d", proc.returncode)
         output = stdout.decode("utf-8", errors="replace").strip()
         output = strip_ansi(output)
+        log.info("Output length: %d chars", len(output))
         if not output:
             return "[No response from OpenCode]"
         return output

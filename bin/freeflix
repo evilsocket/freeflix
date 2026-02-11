@@ -1,0 +1,9 @@
+#!/usr/bin/bash
+docker run -it --rm --name freeflix \
+  -e TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID \
+  -e TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET \
+  -e TELEGRAM_ALLOWED_USERS=$TELEGRAM_ALLOWED_USERS \
+  -e TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN \
+  -v "$(pwd):/downloads" \
+  -v "$HOME/.freeflix:/data" \
+  freeflix
