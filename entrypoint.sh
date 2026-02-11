@@ -4,6 +4,10 @@ set -e
 # Trap to clean up background processes on exit
 trap 'tmux kill-server 2>/dev/null; exit 0' EXIT INT TERM
 
+cat /opt/freeflix/config/ascii_logo.txt 2>/dev/null || true
+echo ""
+echo "  freeflix v${FREEFLIX_VERSION:-1.0.0}"
+echo ""
 echo "[freeflix] Starting services..."
 
 # ── 0. Configure tmux keybindings ──
@@ -73,6 +77,11 @@ torrra config set indexers.jackett.api_key "$JACKETT_API_KEY"
 torrra config set indexers.default jackett
 torrra config set general.download_path /downloads
 torrra config set general.theme dracula
+
+# Patch torrra to default to Downloads view instead of Search
+find /usr/local/lib -path "*/torrra/*" -name "*.py" -exec \
+  sed -i 's/initial="search_content"/initial="downloads_content"/' {} + 2>/dev/null || true
+echo "[freeflix] Patched Torra default view to Downloads"
 
 # ── 5. Set up persistent Torra SQLite DB ──
 # /data is a dedicated volume mounted to ~/.freeflix on the host
@@ -213,9 +222,6 @@ echo "[freeflix] Launching tmux sessions..."
 # Torra TUI session (runs as host user so downloads have correct ownership)
 tmux new-session -d -s torra \
   "$TORRA_RUN $TORRRA_BIN jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY; echo '[freeflix] Torra exited. Press enter for shell.'; read; exec bash"
-
-# Switch Torra TUI to Downloads view after it initializes
-(sleep 3 && tmux send-keys -t torra 'j' && sleep 0.2 && tmux send-keys -t torra 'l') &
 
 # OpenCode agent session (resumes last session if available)
 tmux new-session -d -s main \

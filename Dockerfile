@@ -66,6 +66,7 @@ COPY config/ /opt/freeflix/config/
 COPY entrypoint.sh /opt/freeflix/entrypoint.sh
 RUN chmod +x /opt/freeflix/entrypoint.sh
 
+ENV FREEFLIX_VERSION="1.0.0"
 ENV OPENCODE_MODEL="opencode/kimi-k2.5-free"
 
 WORKDIR /work
