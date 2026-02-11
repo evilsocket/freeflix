@@ -13,6 +13,9 @@ Talk to an AI that searches for movies, TV shows, music, ebooks and more, then q
 
 <p align="center">
   <video src="https://github.com/evilsocket/freeflix/raw/refs/heads/main/demo.mov" width="800"></video>
+
+  [![demo](https://github.com/evilsocket/freeflix/raw/refs/heads/main/demo.gif)](https://youtu.be/N_dJkyADcPs)
+
 </p>
 
 ## Quick Start
