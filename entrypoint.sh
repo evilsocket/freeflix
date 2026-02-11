@@ -49,7 +49,7 @@ done
 
 # ── 2. Start Jackett as the first tmux window ──
 echo "[freeflix] Starting Jackett..."
-tmux new-session -d -s freeflix -n jackett \
+tmux new-session -d -s freeflix -n indexer \
   "/opt/Jackett/jackett --NoUpdates --NoRestart --DataFolder /config/jackett; echo '[freeflix] Jackett exited. Press enter for shell.'; read; exec bash"
 
 # Wait for Jackett to be ready
@@ -256,7 +256,7 @@ fi
 echo "[freeflix] Launching services..."
 
 # Torra TUI (runs as host user so downloads have correct ownership)
-tmux new-window -t freeflix -n torra \
+tmux new-window -t freeflix -n downloads \
   "$TORRA_RUN $TORRRA_BIN jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY; echo '[freeflix] Torra exited. Press enter for shell.'; read; exec bash"
 
 # ── 12. Optionally start Telegram bot ──
@@ -279,7 +279,7 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   if [ -n "$SESSION_ID" ]; then
     ATTACH_CMD="$ATTACH_CMD --session $SESSION_ID"
   fi
-  tmux new-window -t freeflix -n opencode \
+  tmux new-window -t freeflix -n chat \
     "cd /work && echo '[freeflix] Waiting for OpenCode server...' && until $ATTACH_CMD; do sleep 2; done; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
 else
   # Direct mode: plain TUI, resume session if available
@@ -287,7 +287,7 @@ else
   if [ -n "$SESSION_ID" ]; then
     RESUME_FLAG="--session $SESSION_ID"
   fi
-  tmux new-window -t freeflix -n opencode \
+  tmux new-window -t freeflix -n chat \
     "cd /work && $OPENCODE_BIN $RESUME_FLAG; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 fi
 
@@ -298,7 +298,7 @@ tmux new-window -t freeflix -n shell "cd /downloads && exec bash"
 sleep 1
 
 # Select the opencode window
-tmux select-window -t freeflix:opencode
+tmux select-window -t freeflix:chat
 
 echo ""
 echo "[freeflix] Ready! Click tabs at the bottom or use Ctrl-b Left/Right to switch."

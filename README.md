@@ -48,10 +48,11 @@ docker pull ghcr.io/evilsocket/freeflix:latest
 
 Click the tabs at the bottom or use **Ctrl-b Left/Right** to switch between:
 
-- **jackett** — torrent indexer logs
-- **torra** — download manager TUI
+- **indexer** — torrent indexer logs
+- **downloads** — download manager TUI
 - **telegram** — Telegram bot logs *(only when enabled)*
-- **opencode** — AI agent chat *(selected by default)*
+- **chat** — AI agent *(selected by default)*
+- **shell** — bash shell in /downloads
 
 Just type naturally. Some examples:
 
