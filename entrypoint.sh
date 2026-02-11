@@ -272,6 +272,9 @@ else
     "cd /work && $OPENCODE_BIN $RESUME_FLAG; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 fi
 
+# Shell tab
+tmux new-window -t freeflix -n shell "exec bash"
+
 # Give windows a moment to initialize
 sleep 1
 
