@@ -36,14 +36,16 @@ echo "[freeflix] Pre-configuring Jackett indexers..."
 mkdir -p /config/jackett/Indexers
 
 # For public indexers, Jackett just needs the config file to exist with an empty array
-for indexer in thepiratebay 1337x; do
+for indexer in thepiratebay 1337x yts; do
   echo "[]" > "/config/jackett/Indexers/$indexer.json"
   echo "[freeflix]   + $indexer pre-configured"
 done
 
-# UIndex: attempt (may not exist as a valid indexer id)
-echo "[]" > "/config/jackett/Indexers/uindex.json"
-echo "[freeflix]   + uindex pre-configured (may be removed by Jackett if unsupported)"
+# These may not exist as valid indexer IDs — Jackett will remove them if unsupported
+for indexer in uindex; do
+  echo "[]" > "/config/jackett/Indexers/$indexer.json"
+  echo "[freeflix]   + $indexer pre-configured (may be removed by Jackett if unsupported)"
+done
 
 # ── 2. Start Jackett as the first tmux window ──
 echo "[freeflix] Starting Jackett..."
@@ -75,7 +77,7 @@ if [ -n "$CONFIGURED" ]; then
 else
   echo "[freeflix]   ! No indexers loaded via pre-seed, trying API fallback..."
   # Fallback: enable via API
-  for indexer in thepiratebay 1337x uindex; do
+  for indexer in thepiratebay 1337x yts uindex; do
     cfg=$(curl -sf "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" 2>/dev/null) || continue
     curl -sf -X POST "http://localhost:9117/api/v2.0/indexers/$indexer/config?apikey=$JACKETT_API_KEY" \
       -H "Content-Type: application/json" -d "$cfg" > /dev/null 2>&1 && \
@@ -223,13 +225,6 @@ echo "[freeflix] Found torrra at $TORRRA_BIN"
 mkdir -p /data/opencode
 ln -sfn /data/opencode "$HOME/.local/share/opencode"
 
-# Auto-resume last session if one exists
-OPENCODE_RESUME=""
-if [ -d /data/opencode ] && ls /data/opencode/*.session 2>/dev/null | head -1 > /dev/null 2>&1; then
-  OPENCODE_RESUME="--continue"
-  echo "[freeflix] Found previous session, will resume"
-fi
-
 # ── 11. Launch remaining tmux windows ──
 echo "[freeflix] Launching services..."
 
@@ -256,9 +251,9 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   tmux new-window -t freeflix -n opencode \
     "cd /work && echo '[freeflix] Waiting for OpenCode server...' && until $OPENCODE_BIN attach http://localhost:4096; do sleep 2; done; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
 else
-  # Direct mode: plain TUI, no server needed
+  # Direct mode: plain TUI, always try to resume last session
   tmux new-window -t freeflix -n opencode \
-    "cd /work && $OPENCODE_BIN $OPENCODE_RESUME; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
+    "cd /work && $OPENCODE_BIN --continue; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 fi
 
 # Give windows a moment to initialize

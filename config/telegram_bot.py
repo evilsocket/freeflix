@@ -164,10 +164,10 @@ async def _exec_opencode(prompt: str, use_continue: bool) -> tuple[int, str]:
 
 async def run_opencode(prompt: str) -> str:
     async with opencode_lock:
-        # Try continuing the last session; if none exists, create a new one
+        # Try continuing the existing session (shared with TUI)
         rc, output = await _exec_opencode(prompt, use_continue=True)
         if rc != 0:
-            log.info("--continue failed (rc=%d), retrying without it", rc)
+            log.info("--continue failed (rc=%d), creating new session", rc)
             rc, output = await _exec_opencode(prompt, use_continue=False)
         if not output:
             return "[No response from OpenCode]"
