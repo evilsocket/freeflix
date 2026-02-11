@@ -32,10 +32,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Stage 2: Tool installs (cached independently) ──
 FROM base AS tools
 
-# Jackett
+# Jackett (arch-aware)
+ARG TARGETARCH
 RUN JACKETT_VERSION=$(curl -sfL "https://api.github.com/repos/Jackett/Jackett/releases/latest" | jq -r '.tag_name') && \
-    echo "Installing Jackett ${JACKETT_VERSION}..." && \
-    wget -q "https://github.com/Jackett/Jackett/releases/download/${JACKETT_VERSION}/Jackett.Binaries.LinuxAMDx64.tar.gz" -O /tmp/jackett.tar.gz && \
+    echo "Installing Jackett ${JACKETT_VERSION} for ${TARGETARCH}..." && \
+    if [ "$TARGETARCH" = "arm64" ]; then JACKETT_ARCH="LinuxARM64"; else JACKETT_ARCH="LinuxAMDx64"; fi && \
+    wget -q "https://github.com/Jackett/Jackett/releases/download/${JACKETT_VERSION}/Jackett.Binaries.${JACKETT_ARCH}.tar.gz" -O /tmp/jackett.tar.gz && \
     tar -xzf /tmp/jackett.tar.gz -C /opt/ && \
     rm /tmp/jackett.tar.gz && \
     chmod +x /opt/Jackett/jackett
