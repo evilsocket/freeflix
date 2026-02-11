@@ -133,6 +133,7 @@ pull_and_run() {
   echo -e "  ${DIM}docker pull $IMAGE${RESET}"
   docker pull "$IMAGE"
   echo ""
+  docker rm -f freeflix 2>/dev/null || true
   echo -e "  ${DIM}${CMD[*]}${RESET}"
   echo ""
   exec "${CMD[@]}"
@@ -173,7 +174,8 @@ CMD+=(-v "$DOWNLOADS_DIR:/downloads")
 CMD+=(-v "$HOME/.freeflix:/data")
 CMD+=("$IMAGE")
 
-# Pull latest and run
+# Remove leftover container and pull latest
+docker rm -f freeflix 2>/dev/null || true
 docker pull "$IMAGE"
 exec "${CMD[@]}"
 LAUNCHER
