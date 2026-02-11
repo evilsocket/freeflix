@@ -7,9 +7,8 @@ import sys
 import asyncio
 import logging
 
+import telegramify_markdown
 from telegram import Update
-from telegram.constants import ParseMode
-from telegram.error import BadRequest
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -146,11 +145,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     response = await run_opencode(prompt)
 
-    for chunk in split_message(response):
-        try:
-            await update.message.reply_text(chunk, parse_mode=ParseMode.MARKDOWN)
-        except BadRequest:
-            await update.message.reply_text(chunk)
+    converted = telegramify_markdown.markdownify(response)
+    for chunk in split_message(converted):
+        await update.message.reply_markdown_v2(chunk)
 
 
 def main() -> None:
