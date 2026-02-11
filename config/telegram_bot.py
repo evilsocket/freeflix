@@ -4,6 +4,8 @@
 import os
 import re
 import sys
+import json
+import glob
 import asyncio
 import logging
 import tempfile
@@ -25,6 +27,7 @@ from telegram.ext import (
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 OPENCODE_TIMEOUT = 300  # 5 minutes max per request
 TELEGRAM_MAX_LEN = 4096
+SESSION_DIR = "/data/opencode/storage/session/global"
 
 # ── Globals ──
 ALLOWED_USERS: set[int] = set()
@@ -134,10 +137,29 @@ def split_message(text: str, max_len: int = TELEGRAM_MAX_LEN) -> list[str]:
     return chunks
 
 
-async def _exec_opencode(prompt: str, use_continue: bool) -> tuple[int, str]:
+def get_latest_session_id() -> str | None:
+    """Find the most recently updated session from OpenCode's storage."""
+    session_files = glob.glob(os.path.join(SESSION_DIR, "ses_*.json"))
+    if not session_files:
+        return None
+    best_id, best_time = None, 0
+    for path in session_files:
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            updated = data.get("time", {}).get("updated", 0)
+            if updated > best_time:
+                best_time = updated
+                best_id = data.get("id")
+        except (json.JSONDecodeError, OSError):
+            continue
+    return best_id
+
+
+async def _exec_opencode(prompt: str, session_id: str | None = None) -> tuple[int, str]:
     cmd = ["opencode", "run", "--attach", "http://localhost:4096"]
-    if use_continue:
-        cmd.append("--continue")
+    if session_id:
+        cmd.extend(["--session", session_id])
     cmd.append(prompt)
     log.info("Running: %s", " ".join(cmd))
     proc = await asyncio.create_subprocess_exec(
@@ -164,11 +186,16 @@ async def _exec_opencode(prompt: str, use_continue: bool) -> tuple[int, str]:
 
 async def run_opencode(prompt: str) -> str:
     async with opencode_lock:
-        # Try continuing the existing session (shared with TUI)
-        rc, output = await _exec_opencode(prompt, use_continue=True)
-        if rc != 0:
-            log.info("--continue failed (rc=%d), creating new session", rc)
-            rc, output = await _exec_opencode(prompt, use_continue=False)
+        # Find the latest session (shared with TUI)
+        session_id = get_latest_session_id()
+        if session_id:
+            log.info("Using session: %s", session_id)
+
+        rc, output = await _exec_opencode(prompt, session_id=session_id)
+        if rc != 0 and session_id:
+            # Session might be stale, try without it (creates new)
+            log.info("--session failed (rc=%d), creating new session", rc)
+            rc, output = await _exec_opencode(prompt, session_id=None)
         if not output:
             return "[No response from OpenCode]"
         return output

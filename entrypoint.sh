@@ -225,6 +225,18 @@ echo "[freeflix] Found torrra at $TORRRA_BIN"
 mkdir -p /data/opencode
 ln -sfn /data/opencode "$HOME/.local/share/opencode"
 
+# Find the most recently updated session for resumption
+SESSION_ID=""
+SESSION_DIR="/data/opencode/storage/session/global"
+if [ -d "$SESSION_DIR" ]; then
+  # Pick the session with the highest time.updated value
+  SESSION_ID=$(jq -r '[.id, (.time.updated // 0 | tostring)] | join(" ")' "$SESSION_DIR"/ses_*.json 2>/dev/null \
+    | sort -k2 -n -r | head -1 | cut -d' ' -f1)
+  if [ -n "$SESSION_ID" ]; then
+    echo "[freeflix] Found previous session: $SESSION_ID"
+  fi
+fi
+
 # ── 11. Launch remaining tmux windows ──
 echo "[freeflix] Launching services..."
 
@@ -247,13 +259,21 @@ if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   tmux new-session -d -s opencode-server \
     "cd /work && $OPENCODE_BIN serve --port 4096; echo '[freeflix] OpenCode server exited. Press enter for shell.'; read; exec bash"
 
-  # TUI attaches to the running server (retry until server is ready)
+  # TUI attaches to the running server, resuming session if available
+  ATTACH_CMD="$OPENCODE_BIN attach http://localhost:4096"
+  if [ -n "$SESSION_ID" ]; then
+    ATTACH_CMD="$ATTACH_CMD --session $SESSION_ID"
+  fi
   tmux new-window -t freeflix -n opencode \
-    "cd /work && echo '[freeflix] Waiting for OpenCode server...' && until $OPENCODE_BIN attach http://localhost:4096; do sleep 2; done; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
+    "cd /work && echo '[freeflix] Waiting for OpenCode server...' && until $ATTACH_CMD; do sleep 2; done; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
 else
-  # Direct mode: plain TUI, always try to resume last session
+  # Direct mode: plain TUI, resume session if available
+  RESUME_FLAG=""
+  if [ -n "$SESSION_ID" ]; then
+    RESUME_FLAG="--session $SESSION_ID"
+  fi
   tmux new-window -t freeflix -n opencode \
-    "cd /work && $OPENCODE_BIN --continue; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
+    "cd /work && $OPENCODE_BIN $RESUME_FLAG; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 fi
 
 # Give windows a moment to initialize
