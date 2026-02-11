@@ -72,7 +72,7 @@ async def run_opencode(prompt: str) -> str:
     async with opencode_lock:
         log.info("Running: opencode run --attach http://localhost:4096 %r", prompt)
         proc = await asyncio.create_subprocess_exec(
-            "opencode", "run", "--attach", "http://localhost:4096", prompt,
+            "opencode", "run", "--attach", "http://localhost:4096", "--continue", prompt,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             cwd="/work",
