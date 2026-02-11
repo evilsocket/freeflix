@@ -38,6 +38,12 @@ The wizard will:
 
 On subsequent runs, the wizard loads your saved config and starts immediately. To reconfigure, decline the quick-start prompt and the wizard will walk you through the options again.
 
+To update to the latest version:
+
+```bash
+docker pull ghcr.io/evilsocket/freeflix:latest
+```
+
 ## Usage
 
 Click the tabs at the bottom or use **Ctrl-b Left/Right** to switch between:
