@@ -69,10 +69,14 @@ ask_yn() {
 build_cmd() {
   CMD=(docker run -it --rm --name freeflix)
 
+  [ -n "$LOCAL_MODEL_URL" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
   [ -n "$ANTHROPIC_API_KEY" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
   [ -n "$OPENAI_API_KEY" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
   [ -n "$OPENCODE_MODEL" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
   [ -n "$OPENCODE_API_KEY" ]       && CMD+=(-e "OPENCODE_API_KEY=$OPENCODE_API_KEY")
+  [ -n "$LOCAL_MODEL_URL" ]        && CMD+=(-e "LOCAL_MODEL_URL=$LOCAL_MODEL_URL")
+  [ -n "$LOCAL_MODEL_NAME" ]       && CMD+=(-e "LOCAL_MODEL_NAME=$LOCAL_MODEL_NAME")
+  [ -n "$LOCAL_PROVIDER_NAME" ]    && CMD+=(-e "LOCAL_PROVIDER_NAME=$LOCAL_PROVIDER_NAME")
   [ -n "$TRAKT_CLIENT_ID" ]        && CMD+=(-e "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID")
   [ -n "$TRAKT_CLIENT_SECRET" ]    && CMD+=(-e "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET")
   [ -n "$TELEGRAM_BOT_TOKEN" ]     && CMD+=(-e "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN")
@@ -89,6 +93,8 @@ show_summary() {
     echo "  LLM Provider:    Anthropic ($(mask "$ANTHROPIC_API_KEY"))"
   elif [ -n "$OPENAI_API_KEY" ]; then
     echo "  LLM Provider:    OpenAI ($(mask "$OPENAI_API_KEY"))"
+  elif [ -n "$LOCAL_MODEL_URL" ]; then
+    echo "  LLM Provider:    ${LOCAL_PROVIDER_NAME:-Local Model} ($LOCAL_MODEL_NAME @ $LOCAL_MODEL_URL)"
   elif [ -n "$OPENCODE_MODEL" ]; then
     echo "  LLM Provider:    $OPENCODE_MODEL"
   else
@@ -126,6 +132,9 @@ TRAKT_CLIENT_ID="$TRAKT_CLIENT_ID"
 TRAKT_CLIENT_SECRET="$TRAKT_CLIENT_SECRET"
 TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN"
 TELEGRAM_ALLOWED_USERS="$TELEGRAM_ALLOWED_USERS"
+LOCAL_MODEL_URL="$LOCAL_MODEL_URL"
+LOCAL_MODEL_NAME="$LOCAL_MODEL_NAME"
+LOCAL_PROVIDER_NAME="$LOCAL_PROVIDER_NAME"
 EOF
   chmod 600 "$ENV_FILE"
 }
@@ -163,10 +172,14 @@ source "$ENV_FILE"
 
 CMD=(docker run -it --rm --name freeflix)
 
+[ -n "${LOCAL_MODEL_URL:-}" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
 [ -n "${ANTHROPIC_API_KEY:-}" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
 [ -n "${OPENAI_API_KEY:-}" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
 [ -n "${OPENCODE_MODEL:-}" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
 [ -n "${OPENCODE_API_KEY:-}" ]       && CMD+=(-e "OPENCODE_API_KEY=$OPENCODE_API_KEY")
+[ -n "${LOCAL_MODEL_URL:-}" ]        && CMD+=(-e "LOCAL_MODEL_URL=$LOCAL_MODEL_URL")
+[ -n "${LOCAL_MODEL_NAME:-}" ]       && CMD+=(-e "LOCAL_MODEL_NAME=$LOCAL_MODEL_NAME")
+[ -n "${LOCAL_PROVIDER_NAME:-}" ]    && CMD+=(-e "LOCAL_PROVIDER_NAME=$LOCAL_PROVIDER_NAME")
 [ -n "${TRAKT_CLIENT_ID:-}" ]        && CMD+=(-e "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID")
 [ -n "${TRAKT_CLIENT_SECRET:-}" ]    && CMD+=(-e "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET")
 [ -n "${TELEGRAM_BOT_TOKEN:-}" ]     && CMD+=(-e "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN")
@@ -252,6 +265,9 @@ TRAKT_CLIENT_ID=""
 TRAKT_CLIENT_SECRET=""
 TELEGRAM_BOT_TOKEN=""
 TELEGRAM_ALLOWED_USERS=""
+LOCAL_MODEL_URL=""
+LOCAL_MODEL_NAME=""
+LOCAL_PROVIDER_NAME=""
 DOWNLOADS_DIR="$(pwd)"
 
 # ── If config exists, load and run (skip wizard) ──
@@ -285,6 +301,7 @@ echo "  1) OpenCode Zen free tier (no API key needed)"
 echo "  2) Anthropic (Claude)"
 echo "  3) OpenAI (GPT-4o)"
 echo "  4) Custom model"
+echo "  5) Local model (Ollama, llama.cpp, vLLM, LM Studio)"
 echo ""
 
 # Detect current provider for default
@@ -292,12 +309,13 @@ DEFAULT_LLM="1"
 [ -n "$ANTHROPIC_API_KEY" ] && DEFAULT_LLM="2"
 [ -n "$OPENAI_API_KEY" ] && DEFAULT_LLM="3"
 [ -n "$OPENCODE_MODEL" ] && [ -n "$OPENCODE_API_KEY" ] && DEFAULT_LLM="4"
+[ -n "$LOCAL_MODEL_URL" ] && DEFAULT_LLM="5"
 
 while true; do
-  LLM_CHOICE=$(ask "Choose provider (1-4)" "$DEFAULT_LLM")
+  LLM_CHOICE=$(ask "Choose provider (1-5)" "$DEFAULT_LLM")
   case "$LLM_CHOICE" in
-    1|2|3|4) break ;;
-    *) error "  Invalid choice: $LLM_CHOICE (enter 1-4)" ;;
+    1|2|3|4|5) break ;;
+    *) error "  Invalid choice: $LLM_CHOICE (enter 1-5)" ;;
   esac
 done
 
@@ -306,6 +324,9 @@ ANTHROPIC_API_KEY=""
 OPENAI_API_KEY=""
 OPENCODE_MODEL=""
 OPENCODE_API_KEY=""
+LOCAL_MODEL_URL=""
+LOCAL_MODEL_NAME=""
+LOCAL_PROVIDER_NAME=""
 
 case "$LLM_CHOICE" in
   2)
@@ -327,6 +348,19 @@ case "$LLM_CHOICE" in
     OPENCODE_API_KEY=$(ask "API key (if needed)" "$OPENCODE_API_KEY")
     if [ -z "$OPENCODE_MODEL" ]; then
       error "  Model name is required"
+      exit 1
+    fi
+    ;;
+  5)
+    echo ""
+    echo -e "  ${DIM}Your model server must expose an OpenAI-compatible API.${RESET}"
+    echo -e "  ${DIM}The container reaches your host via host.docker.internal.${RESET}"
+    echo ""
+    LOCAL_MODEL_URL=$(ask "API base URL" "${LOCAL_MODEL_URL:-http://host.docker.internal:11434/v1}")
+    LOCAL_MODEL_NAME=$(ask "Model name (as known to your server)" "${LOCAL_MODEL_NAME:-qwen3:8b}")
+    LOCAL_PROVIDER_NAME=$(ask "Provider label" "${LOCAL_PROVIDER_NAME:-Local Model}")
+    if [ -z "$LOCAL_MODEL_URL" ] || [ -z "$LOCAL_MODEL_NAME" ]; then
+      error "  URL and model name are required"
       exit 1
     fi
     ;;

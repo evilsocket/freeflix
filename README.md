@@ -105,9 +105,18 @@ All settings are stored in `~/.freeflix/.env` (created by the wizard). You can e
 | `TRAKT_CLIENT_SECRET` | Trakt app client secret |
 | `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs |
+| `LOCAL_MODEL_URL` | Base URL for local OpenAI-compatible API (e.g. `http://host.docker.internal:11434/v1`) |
+| `LOCAL_MODEL_NAME` | Model name as known to the local server (e.g. `qwen3:8b`) |
+| `LOCAL_PROVIDER_NAME` | Display label for the provider (e.g. `Ollama`) |
 | `DOWNLOADS_DIR` | Host directory for downloads |
 
 If no LLM key is provided, the free [OpenCode Zen](https://opencode.ai/zen) tier is used.
+
+## Local Models
+
+If you run a local model server (Ollama, llama.cpp, vLLM, LM Studio) on your machine, choose option 5 in the wizard. The container reaches your host at `host.docker.internal` — the default URL is set for Ollama (`http://host.docker.internal:11434/v1`).
+
+Any server that exposes an OpenAI-compatible `/v1/chat/completions` endpoint will work. Just provide the correct base URL and model name when prompted.
 
 ## Building from Source
 

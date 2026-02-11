@@ -216,9 +216,25 @@ to start the auth flow, then guide the user through it.
 3. **Fetch their watchlist** — know what they've saved to watch later
 4. **Check trending/popular** content — find what's new and cross-reference
 
+### Sparse ratings — extrapolate from watch history
+
+Many users watch a lot but rate very little. If the number of ratings is small compared
+to the total number of watched items (e.g. <20% of watched items have ratings), **do not
+rely on ratings alone** — they are too sparse to be representative. Instead:
+
+- **Treat the full watch history as the primary signal.** The fact that someone watched
+  something is itself a data point — people choose what to watch.
+- **Infer genre/director/actor/era preferences** from the corpus of watched titles, not
+  just from rated ones.
+- **Use ratings as a refinement**, not the foundation. If a user rated 5 things highly
+  but watched 200, the 200 tell you more about their taste than the 5.
+- **Look for patterns in what they kept watching** — completed series, multiple films by
+  the same director, clusters of similar genres.
+
 ### Use this data to:
 - **Never recommend something they've already watched** (check history first)
-- Build a mental model of their taste profile from their ratings
+- Build a mental model of their taste profile from watch history and ratings combined
+- When ratings are sparse, weight watch history patterns more heavily than ratings
 - Proactively suggest content that matches their patterns
 - When they ask "what should I watch?", combine Trakt data with your knowledge
 - Suggest content from their watchlist when appropriate ("You saved X, want to grab it?")

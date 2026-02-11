@@ -118,11 +118,30 @@ ln -sf "$TORRA_DB" "$HOME/.local/share/torrra/torrra.db"
 
 # ── 6. Determine model ──
 MODEL="${OPENCODE_MODEL:-opencode/kimi-k2.5-free}"
-if [ -n "$ANTHROPIC_API_KEY" ]; then
+PROVIDER_SECTION='{}'
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
   MODEL="anthropic/claude-sonnet-4-5"
 fi
-if [ -n "$OPENAI_API_KEY" ]; then
+if [ -n "${OPENAI_API_KEY:-}" ]; then
   MODEL="openai/gpt-4o"
+fi
+if [ -n "${LOCAL_MODEL_URL:-}" ]; then
+  LOCAL_MODEL_NAME="${LOCAL_MODEL_NAME:-qwen3:8b}"
+  LOCAL_PROVIDER_NAME="${LOCAL_PROVIDER_NAME:-Local Model}"
+  MODEL="local/$LOCAL_MODEL_NAME"
+  PROVIDER_SECTION=$(jq -n \
+    --arg name "$LOCAL_PROVIDER_NAME" \
+    --arg url "$LOCAL_MODEL_URL" \
+    --arg model_id "$LOCAL_MODEL_NAME" \
+    '{
+      local: {
+        npm: "@ai-sdk/openai-compatible",
+        name: $name,
+        options: { baseURL: $url },
+        models: { ($model_id): { name: $model_id } }
+      }
+    }')
+  echo "[freeflix] Local model provider: $LOCAL_PROVIDER_NAME ($LOCAL_MODEL_URL)"
 fi
 echo "[freeflix] Using model: $MODEL"
 
@@ -170,8 +189,8 @@ else
   echo "[freeflix] No Trakt credentials, Trakt MCP disabled"
 fi
 
-jq --arg model "$MODEL" --argjson mcp "$MCP_SECTION" \
-  '.model = $model | .mcp = $mcp' \
+jq --arg model "$MODEL" --argjson mcp "$MCP_SECTION" --argjson provider "$PROVIDER_SECTION" \
+  '.model = $model | .mcp = $mcp | if $provider != {} then .provider = $provider else . end' \
   /opt/freeflix/config/opencode.json > /work/opencode.json
 
 # ── 8. Set up non-root user for downloads ──
@@ -273,7 +292,7 @@ else
 fi
 
 # Shell tab
-tmux new-window -t freeflix -n shell "exec bash"
+tmux new-window -t freeflix -n shell "cd /downloads && exec bash"
 
 # Give windows a moment to initialize
 sleep 1
