@@ -39,18 +39,22 @@ Freeflix orchestrates four components inside a single container:
 - **[OpenCode](https://opencode.ai/)** — AI coding agent repurposed as a conversational movie assistant. Uses a custom system prompt with full operational instructions for searching, downloading, and managing torrents.
 - **[Trakt MCP Server](https://github.com/wwiens/trakt_mcpserver)** *(optional)* — When Trakt credentials are provided, the agent uses your watch history and ratings as ground truth to build a taste profile, avoid re-recommending watched content, and personalize suggestions.
 
-Tmux sessions are available, navigable with `Ctrl-b Left/Right`:
+A clickable tab bar at the bottom lets you switch between services (mouse enabled). You can also use `Ctrl-b Left/Right`:
 
-| Session | Content |
-|---------|---------|
+| Tab | Content |
+|-----|---------|
 | `jackett` | Jackett indexer logs |
 | `torra` | Torra download TUI |
 | `telegram` | Telegram bot logs *(only when `TELEGRAM_BOT_TOKEN` is set)* |
-| `main` | OpenCode AI agent (attached by default) |
+| `opencode` | OpenCode AI agent (selected by default) |
 
 ```
-  Ctrl-b Left                                        Ctrl-b Right
-  <────────── jackett | torra | [telegram] | main ──────────>
+  ┌─────────────────────────────────────────┐
+  │  OpenCode AI agent                      │
+  │  ...                                    │
+  ├─────────────────────────────────────────┤
+  │  jackett │ torra │ telegram │ opencode  │
+  └─────────────────────────────────────────┘
 ```
 
 ## Quick Start

@@ -10,11 +10,25 @@ echo "  freeflix v${FREEFLIX_VERSION:-1.0.0}"
 echo ""
 echo "[freeflix] Starting services..."
 
-# ── 0. Configure tmux keybindings ──
+# ── 0. Configure tmux ──
 cat > /root/.tmux.conf << 'TMUX'
-# Switch sessions with Ctrl-b + left/right arrows
-bind-key Left switch-client -p
-bind-key Right switch-client -n
+# Enable mouse (clickable tabs, scrolling)
+set -g mouse on
+
+# Switch windows with Ctrl-b + left/right arrows
+bind-key Left previous-window
+bind-key Right next-window
+
+# Status bar as clickable tab bar (Dracula theme)
+set -g status on
+set -g status-position bottom
+set -g status-style 'bg=#282a36 fg=#f8f8f2'
+set -g status-left ''
+set -g status-right ''
+set -g window-status-format '  #W  '
+set -g window-status-current-format '  #W  '
+set -g window-status-current-style 'bg=#6272a4 fg=#f8f8f2 bold'
+set -g window-status-separator '│'
 TMUX
 
 # ── 1. Pre-seed Jackett indexer configs on disk ──
@@ -31,16 +45,16 @@ done
 echo "[]" > "/config/jackett/Indexers/uindex.json"
 echo "[freeflix]   + uindex pre-configured (may be removed by Jackett if unsupported)"
 
-# ── 2. Start Jackett in its own tmux session ──
+# ── 2. Start Jackett as the first tmux window ──
 echo "[freeflix] Starting Jackett..."
-tmux new-session -d -s jackett \
+tmux new-session -d -s freeflix -n jackett \
   "/opt/Jackett/jackett --NoUpdates --NoRestart --DataFolder /config/jackett; echo '[freeflix] Jackett exited. Press enter for shell.'; read; exec bash"
 
 # Wait for Jackett to be ready
 echo "[freeflix] Waiting for Jackett to be ready..."
 until curl -sf http://localhost:9117 > /dev/null 2>&1; do
-  if ! tmux has-session -t jackett 2>/dev/null; then
-    echo "[freeflix] ERROR: Jackett session died"
+  if ! tmux has-session -t freeflix 2>/dev/null; then
+    echo "[freeflix] ERROR: tmux session died"
     exit 1
   fi
   sleep 1
@@ -216,17 +230,17 @@ if [ -d /data/opencode ] && ls /data/opencode/*.session 2>/dev/null | head -1 > 
   echo "[freeflix] Found previous session, will resume"
 fi
 
-# ── 11. Launch remaining tmux sessions ──
-echo "[freeflix] Launching tmux sessions..."
+# ── 11. Launch remaining tmux windows ──
+echo "[freeflix] Launching services..."
 
-# Torra TUI session (runs as host user so downloads have correct ownership)
-tmux new-session -d -s torra \
+# Torra TUI (runs as host user so downloads have correct ownership)
+tmux new-window -t freeflix -n torra \
   "$TORRA_RUN $TORRRA_BIN jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY; echo '[freeflix] Torra exited. Press enter for shell.'; read; exec bash"
 
 # ── 12. Optionally start Telegram bot ──
 if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   echo "[freeflix] Starting Telegram bot..."
-  tmux new-session -d -s telegram \
+  tmux new-window -t freeflix -n telegram \
     "python3 /opt/freeflix/config/telegram_bot.py; echo '[freeflix] Telegram bot exited. Press enter for shell.'; read; exec bash"
 fi
 
@@ -234,37 +248,28 @@ fi
 if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   # Server mode: allows both TUI and Telegram bot to share the same session
   echo "[freeflix] Telegram enabled, starting OpenCode in server mode..."
+  # opencode-server runs as a background tmux session (not a tab)
   tmux new-session -d -s opencode-server \
     "cd /work && $OPENCODE_BIN serve --port 4096; echo '[freeflix] OpenCode server exited. Press enter for shell.'; read; exec bash"
 
   # TUI attaches to the running server (retry until server is ready)
-  tmux new-session -d -s main \
+  tmux new-window -t freeflix -n opencode \
     "cd /work && echo '[freeflix] Waiting for OpenCode server...' && until $OPENCODE_BIN attach http://localhost:4096; do sleep 2; done; echo '[freeflix] OpenCode TUI exited. Press enter for shell.'; read; exec bash"
 else
   # Direct mode: plain TUI, no server needed
-  tmux new-session -d -s main \
+  tmux new-window -t freeflix -n opencode \
     "cd /work && $OPENCODE_BIN $OPENCODE_RESUME; echo '[freeflix] OpenCode exited. Press enter for shell.'; read; exec bash"
 fi
 
-# Give sessions a moment to initialize
+# Give windows a moment to initialize
 sleep 1
 
-# Verify main session is alive
-if ! tmux has-session -t main 2>/dev/null; then
-  echo "[freeflix] ERROR: main tmux session failed to start"
-  echo "[freeflix] Falling back to shell..."
-  exec bash
-fi
+# Select the opencode window
+tmux select-window -t freeflix:opencode
 
 echo ""
-echo "[freeflix] Ready! Attaching to OpenCode session..."
-echo "[freeflix] Sessions: Ctrl-b Left/Right to switch"
-if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-  echo "[freeflix]   <- jackett | torra | telegram | main (opencode) ->"
-else
-  echo "[freeflix]   <- jackett | torra | main (opencode) ->"
-fi
+echo "[freeflix] Ready! Click tabs at the bottom or use Ctrl-b Left/Right to switch."
 echo ""
 
-# Attach to the main OpenCode session
-exec tmux attach -t main
+# Attach to the freeflix session (opencode window selected)
+exec tmux attach -t freeflix

@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     locales \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
@@ -50,7 +51,7 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
     fi
 
 # Telegram bot (optional, activated by TELEGRAM_BOT_TOKEN env var)
-RUN pip3 install --break-system-packages python-telegram-bot telegramify-markdown
+RUN pip3 install --break-system-packages python-telegram-bot telegramify-markdown SpeechRecognition pydub
 
 # Trakt MCP Server
 RUN git clone https://github.com/wwiens/trakt_mcpserver /opt/trakt_mcpserver && \

@@ -6,9 +6,13 @@ import re
 import sys
 import asyncio
 import logging
+import tempfile
 
+import speech_recognition as sr
+from pydub import AudioSegment
 import telegramify_markdown
 from telegram import Update
+from telegram.helpers import escape_markdown
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -51,6 +55,67 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 def strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text)
+
+
+_TOOL_LINE_RE = re.compile(r"^(\$ |⚙ )")
+_STATUS_LINE_RE = re.compile(r"^> \S+ · ")
+
+
+def format_for_telegram(raw: str) -> str:
+    """Separate tool calls from assistant text.
+
+    Tool call blocks become expandable blockquotes in MarkdownV2.
+    Assistant text is converted via telegramify_markdown.
+    """
+    lines = raw.split("\n")
+    sections: list[tuple[str, list[str]]] = []  # ("tool"|"text", lines)
+    current_type = "text"
+    current: list[str] = []
+
+    for line in lines:
+        # Strip status lines (e.g. "> build · kimi-k2.5-free")
+        if _STATUS_LINE_RE.match(line):
+            continue
+
+        is_tool = bool(_TOOL_LINE_RE.match(line))
+
+        if is_tool and current_type != "tool":
+            # Flush text section, start tool section
+            if current:
+                sections.append(("text", current))
+            current = [line]
+            current_type = "tool"
+        elif not is_tool and current_type == "tool":
+            # Flush tool section, start text section
+            if current:
+                sections.append(("tool", current))
+            current = [line]
+            current_type = "text"
+        else:
+            current.append(line)
+
+    if current:
+        sections.append((current_type, current))
+
+    parts: list[str] = []
+    for stype, slines in sections:
+        text = "\n".join(slines).strip()
+        if not text:
+            continue
+        if stype == "tool":
+            # MarkdownV2 expandable blockquote: **>line\n>line\n>last||
+            escaped = escape_markdown(text, version=2)
+            bq_lines = escaped.split("\n")
+            quoted = "\n".join(
+                ("**>" if i == 0 else ">") + l
+                for i, l in enumerate(bq_lines)
+            )
+            quoted += "||"
+            parts.append(quoted)
+        else:
+            parts.append(telegramify_markdown.markdownify(text))
+
+    return "\n\n".join(parts)
 
 
 def split_message(text: str, max_len: int = TELEGRAM_MAX_LEN) -> list[str]:
@@ -109,6 +174,18 @@ async def run_opencode(prompt: str) -> str:
         return output
 
 
+def transcribe_audio(ogg_path: str) -> str:
+    """Convert OGG voice message to text via Google Speech Recognition."""
+    wav_path = ogg_path.replace(".ogg", ".wav")
+    audio = AudioSegment.from_ogg(ogg_path)
+    audio.export(wav_path, format="wav")
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(wav_path) as source:
+        audio_data = recognizer.record(source)
+    os.unlink(wav_path)
+    return recognizer.recognize_google(audio_data)
+
+
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     if not is_authorized(user_id):
@@ -141,12 +218,87 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     log.info("Message from %s: %s", user_id, prompt[:100])
-    await update.message.chat.send_action("typing")
 
-    response = await run_opencode(prompt)
+    # Keep "typing..." indicator alive throughout the entire OpenCode execution
+    typing_active = True
 
-    converted = telegramify_markdown.markdownify(response)
-    for chunk in split_message(converted):
+    async def keep_typing():
+        while typing_active:
+            await update.message.chat.send_action("typing")
+            await asyncio.sleep(4)
+
+    typing_task = asyncio.create_task(keep_typing())
+    try:
+        response = await run_opencode(prompt)
+    finally:
+        typing_active = False
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
+
+    formatted = format_for_telegram(response)
+    for chunk in split_message(formatted):
+        await update.message.reply_markdown_v2(chunk)
+
+
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    if not is_authorized(user_id):
+        await update.message.reply_text(
+            f"Unauthorized. Your Telegram user ID is: {user_id}\n"
+            "Add it to TELEGRAM_ALLOWED_USERS to gain access."
+        )
+        return
+
+    voice = update.message.voice
+    if not voice:
+        return
+
+    log.info("Voice message from %s, duration: %ds", user_id, voice.duration)
+
+    # Download the voice file
+    voice_file = await context.bot.get_file(voice.file_id)
+    with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
+        ogg_path = tmp.name
+    await voice_file.download_to_drive(ogg_path)
+
+    # Transcribe in a thread to avoid blocking the event loop
+    try:
+        loop = asyncio.get_event_loop()
+        prompt = await loop.run_in_executor(None, transcribe_audio, ogg_path)
+    except Exception as e:
+        log.error("Transcription failed: %s", e)
+        await update.message.reply_text("[Could not transcribe voice message]")
+        return
+    finally:
+        os.unlink(ogg_path)
+
+    log.info("Transcribed: %s", prompt[:100])
+    await update.message.reply_text(f"🎤 {prompt}")
+
+    # Keep "typing..." indicator alive throughout the entire OpenCode execution
+    typing_active = True
+
+    async def keep_typing():
+        while typing_active:
+            await update.message.chat.send_action("typing")
+            await asyncio.sleep(4)
+
+    typing_task = asyncio.create_task(keep_typing())
+    try:
+        response = await run_opencode(prompt)
+    finally:
+        typing_active = False
+        typing_task.cancel()
+        try:
+            await typing_task
+        except asyncio.CancelledError:
+            pass
+
+    formatted = format_for_telegram(response)
+    for chunk in split_message(formatted):
         await update.message.reply_markdown_v2(chunk)
 
 
@@ -166,6 +318,7 @@ def main() -> None:
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", handle_start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
     log.info("Bot polling...")
     app.run_polling(drop_pending_updates=True)
