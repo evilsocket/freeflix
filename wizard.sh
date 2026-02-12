@@ -70,6 +70,7 @@ build_cmd() {
   CMD=(docker run -it --rm --name freeflix)
 
   [ -n "$LOCAL_MODEL_URL" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
+  [ -n "$USE_TOR" ]               && CMD+=(--cap-add=NET_ADMIN -e "USE_TOR=true")
   [ -n "$ANTHROPIC_API_KEY" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
   [ -n "$OPENAI_API_KEY" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
   [ -n "$OPENCODE_MODEL" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
@@ -114,6 +115,12 @@ show_summary() {
     echo "  Telegram:        Disabled"
   fi
 
+  if [ -n "$USE_TOR" ]; then
+    echo "  Tor:             Enabled"
+  else
+    echo "  Tor:             Disabled"
+  fi
+
   echo "  Downloads:       $DOWNLOADS_DIR"
   echo "  Data:            $HOME/.freeflix"
   echo ""
@@ -135,6 +142,7 @@ TELEGRAM_ALLOWED_USERS="$TELEGRAM_ALLOWED_USERS"
 LOCAL_MODEL_URL="$LOCAL_MODEL_URL"
 LOCAL_MODEL_NAME="$LOCAL_MODEL_NAME"
 LOCAL_PROVIDER_NAME="$LOCAL_PROVIDER_NAME"
+USE_TOR="$USE_TOR"
 EOF
   chmod 600 "$ENV_FILE"
 }
@@ -179,6 +187,7 @@ source "$ENV_FILE"
 CMD=(docker run -it --rm --name freeflix)
 
 [ -n "${LOCAL_MODEL_URL:-}" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
+[ -n "${USE_TOR:-}" ]               && CMD+=(--cap-add=NET_ADMIN -e "USE_TOR=true")
 [ -n "${ANTHROPIC_API_KEY:-}" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
 [ -n "${OPENAI_API_KEY:-}" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
 [ -n "${OPENCODE_MODEL:-}" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
@@ -274,6 +283,7 @@ TELEGRAM_ALLOWED_USERS=""
 LOCAL_MODEL_URL=""
 LOCAL_MODEL_NAME=""
 LOCAL_PROVIDER_NAME=""
+USE_TOR=""
 DOWNLOADS_DIR="$(pwd)"
 
 # ── If config exists, load and run (skip wizard) ──
@@ -430,6 +440,21 @@ if [ ! -d "$DOWNLOADS_DIR" ]; then
     error "  Downloads directory must exist"
     exit 1
   fi
+fi
+
+# ── Tor ──
+header "Tor"
+echo -e "  ${DIM}Route all traffic through the Tor network for anonymity.${RESET}"
+echo -e "  ${DIM}Runs entirely inside the container — nothing changes on your host.${RESET}"
+echo ""
+
+TOR_DEFAULT="n"
+[ "$USE_TOR" = "true" ] && TOR_DEFAULT="y"
+
+if ask_yn "Enable Tor?" "$TOR_DEFAULT"; then
+  USE_TOR="true"
+else
+  USE_TOR=""
 fi
 
 # ── Summary ──

@@ -252,21 +252,75 @@ if [ -d "$SESSION_DIR" ]; then
   fi
 fi
 
-# ── 11. Launch remaining tmux windows ──
+# ── 11. Tor transparent proxy (optional) ──
+if [ "${USE_TOR:-}" = "true" ]; then
+  echo "[freeflix] Starting Tor transparent proxy..."
+
+  # Configure Tor as transparent proxy
+  cat > /etc/tor/torrc << TORRC
+TransPort 9040
+DNSPort 5353
+AutomapHostsOnResolve 1
+SocksPort 0
+RunAsDaemon 1
+Log notice file /var/log/tor/tor.log
+TORRC
+
+  # Start Tor daemon
+  mkdir -p /var/log/tor && chown debian-tor:debian-tor /var/log/tor
+  tor -f /etc/tor/torrc
+
+  # Wait for Tor to bootstrap
+  echo "[freeflix] Waiting for Tor to connect..."
+  for i in $(seq 1 30); do
+    if grep -q "Bootstrapped 100%" /var/log/tor/tor.log 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+
+  if grep -q "Bootstrapped 100%" /var/log/tor/tor.log 2>/dev/null; then
+    echo "[freeflix] Tor connected successfully"
+  else
+    echo "[freeflix] WARNING: Tor may not be fully bootstrapped yet (continuing anyway)"
+  fi
+
+  # Get the Tor user UID to exclude from redirection (prevent loops)
+  TOR_UID=$(id -u debian-tor 2>/dev/null || echo "")
+
+  if [ -n "$TOR_UID" ]; then
+    # iptables transparent proxy rules
+    iptables -t nat -A OUTPUT -m owner --uid-owner "$TOR_UID" -j RETURN
+    iptables -t nat -A OUTPUT -d 127.0.0.0/8 -j RETURN
+    iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-ports 9040
+    iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 5353
+    echo "[freeflix] Tor is active. All traffic is being routed through Tor."
+  else
+    echo "[freeflix] WARNING: Could not find debian-tor user, iptables rules not applied"
+  fi
+fi
+
+# ── 12. Launch remaining tmux windows ──
 echo "[freeflix] Launching services..."
 
 # Torra TUI (runs as host user so downloads have correct ownership)
 tmux new-window -t freeflix -n downloads \
   "$TORRA_RUN $TORRRA_BIN jackett --url http://localhost:9117 --api-key $JACKETT_API_KEY; echo '[freeflix] Torra exited. Press enter for shell.'; read; exec bash"
 
-# ── 12. Optionally start Telegram bot ──
+# ── 13. Optionally start Telegram bot ──
 if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   echo "[freeflix] Starting Telegram bot..."
   tmux new-window -t freeflix -n telegram \
     "python3 /opt/freeflix/bin/telegram_bot.py; echo '[freeflix] Telegram bot exited. Press enter for shell.'; read; exec bash"
 fi
 
-# ── 13. Launch OpenCode ──
+# ── 14. Optionally add Tor log tab ──
+if [ "${USE_TOR:-}" = "true" ]; then
+  tmux new-window -t freeflix -n tor \
+    "tail -f /var/log/tor/tor.log; exec bash"
+fi
+
+# ── 15. Launch OpenCode ──
 if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
   # Server mode: allows both TUI and Telegram bot to share the same session
   echo "[freeflix] Telegram enabled, starting OpenCode in server mode..."
