@@ -252,27 +252,23 @@ if [ -d "$SESSION_DIR" ]; then
   fi
 fi
 
-# ── 11. Tor transparent proxy (optional) ──
+# ── 11. Tor SOCKS proxy (optional) ──
 if [ "${USE_TOR:-}" = "true" ]; then
-  echo "[freeflix] Starting Tor transparent proxy..."
+  echo "[freeflix] Starting Tor..."
 
-  # Configure Tor as transparent proxy
+  # Configure Tor as SOCKS proxy
   cat > /etc/tor/torrc << TORRC
-TransPort 9040
-DNSPort 5353
-AutomapHostsOnResolve 1
-SocksPort 0
+SocksPort 9050
 RunAsDaemon 1
 Log notice file /var/log/tor/tor.log
 TORRC
 
-  # Start Tor daemon
   mkdir -p /var/log/tor && chown debian-tor:debian-tor /var/log/tor
   tor -f /etc/tor/torrc
 
   # Wait for Tor to bootstrap
   echo "[freeflix] Waiting for Tor to connect..."
-  for i in $(seq 1 30); do
+  for i in $(seq 1 60); do
     if grep -q "Bootstrapped 100%" /var/log/tor/tor.log 2>/dev/null; then
       break
     fi
@@ -285,20 +281,14 @@ TORRC
     echo "[freeflix] WARNING: Tor may not be fully bootstrapped yet (continuing anyway)"
   fi
 
-  # Get the Tor user UID to exclude from redirection (prevent loops)
-  TOR_UID=$(id -u debian-tor 2>/dev/null || echo "")
-
-  if [ -n "$TOR_UID" ]; then
-    # Use iptables-legacy — nf_tables backend doesn't work inside containers
-    IPT=$(command -v iptables-legacy 2>/dev/null || command -v iptables)
-    $IPT -t nat -A OUTPUT -m owner --uid-owner "$TOR_UID" -j RETURN
-    $IPT -t nat -A OUTPUT -d 127.0.0.0/8 -j RETURN
-    $IPT -t nat -A OUTPUT -p tcp -j REDIRECT --to-ports 9040
-    $IPT -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 5353
-    echo "[freeflix] Tor is active. All traffic is being routed through Tor."
-  else
-    echo "[freeflix] WARNING: Could not find debian-tor user, iptables rules not applied"
-  fi
+  # Route all HTTP/HTTPS traffic through Tor via SOCKS proxy
+  # socks5h = DNS resolution also goes through Tor
+  export http_proxy="socks5h://127.0.0.1:9050"
+  export https_proxy="socks5h://127.0.0.1:9050"
+  export HTTP_PROXY="socks5h://127.0.0.1:9050"
+  export HTTPS_PROXY="socks5h://127.0.0.1:9050"
+  export ALL_PROXY="socks5h://127.0.0.1:9050"
+  echo "[freeflix] Tor is active. All HTTP/HTTPS traffic is routed through Tor."
 fi
 
 # ── 12. Launch remaining tmux windows ──

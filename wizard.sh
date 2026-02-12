@@ -70,7 +70,7 @@ build_cmd() {
   CMD=(docker run -it --rm --name freeflix)
 
   [ -n "$LOCAL_MODEL_URL" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
-  [ -n "$USE_TOR" ]               && CMD+=(--cap-add=NET_ADMIN -e "USE_TOR=true")
+  [ -n "$USE_TOR" ]               && CMD+=(-e "USE_TOR=true")
   [ -n "$ANTHROPIC_API_KEY" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
   [ -n "$OPENAI_API_KEY" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
   [ -n "$OPENCODE_MODEL" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
@@ -187,7 +187,7 @@ source "$ENV_FILE"
 CMD=(docker run -it --rm --name freeflix)
 
 [ -n "${LOCAL_MODEL_URL:-}" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
-[ -n "${USE_TOR:-}" ]               && CMD+=(--cap-add=NET_ADMIN -e "USE_TOR=true")
+[ -n "${USE_TOR:-}" ]               && CMD+=(-e "USE_TOR=true")
 [ -n "${ANTHROPIC_API_KEY:-}" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
 [ -n "${OPENAI_API_KEY:-}" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
 [ -n "${OPENCODE_MODEL:-}" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
