@@ -51,7 +51,6 @@ Click the tabs at the bottom or use **Ctrl-b Left/Right** to switch between:
 - **indexer** — torrent indexer logs
 - **downloads** — download manager TUI
 - **telegram** — Telegram bot logs *(only when enabled)*
-- **tor** — Tor connection logs *(only when enabled)*
 - **chat** — AI agent *(selected by default)*
 - **shell** — bash shell in /downloads
 
@@ -110,7 +109,6 @@ All settings are stored in `~/.freeflix/.env` (created by the wizard). You can e
 | `LOCAL_MODEL_URL` | Base URL for local OpenAI-compatible API (e.g. `http://host.docker.internal:11434/v1`) |
 | `LOCAL_MODEL_NAME` | Model name as known to the local server (e.g. `qwen3:8b`) |
 | `LOCAL_PROVIDER_NAME` | Display label for the provider (e.g. `Ollama`) |
-| `USE_TOR` | Set to `true` to route all traffic through Tor |
 | `DOWNLOADS_DIR` | Host directory for downloads |
 
 If no LLM key is provided, the free [OpenCode Zen](https://opencode.ai/zen) tier is used.
@@ -120,12 +118,6 @@ If no LLM key is provided, the free [OpenCode Zen](https://opencode.ai/zen) tier
 If you run a local model server (Ollama, llama.cpp, vLLM, LM Studio) on your machine, choose option 5 in the wizard. The container reaches your host at `host.docker.internal` — the default URL is set for Ollama (`http://host.docker.internal:11434/v1`).
 
 Any server that exposes an OpenAI-compatible `/v1/chat/completions` endpoint will work. Just provide the correct base URL and model name when prompted.
-
-## Tor
-
-Enable Tor in the wizard to route all container traffic through the Tor network. Tor runs inside the container — nothing is installed or modified on your host. This covers all traffic: torrent indexer queries, LLM API calls, and Telegram.
-
-Note: Tor adds latency. LLM API calls and torrent searches will be slower. Some services may block Tor exit nodes.
 
 ## Building from Source
 
