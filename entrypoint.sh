@@ -289,11 +289,12 @@ TORRC
   TOR_UID=$(id -u debian-tor 2>/dev/null || echo "")
 
   if [ -n "$TOR_UID" ]; then
-    # iptables transparent proxy rules
-    iptables -t nat -A OUTPUT -m owner --uid-owner "$TOR_UID" -j RETURN
-    iptables -t nat -A OUTPUT -d 127.0.0.0/8 -j RETURN
-    iptables -t nat -A OUTPUT -p tcp -j REDIRECT --to-ports 9040
-    iptables -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 5353
+    # Use iptables-legacy — nf_tables backend doesn't work inside containers
+    IPT=$(command -v iptables-legacy 2>/dev/null || command -v iptables)
+    $IPT -t nat -A OUTPUT -m owner --uid-owner "$TOR_UID" -j RETURN
+    $IPT -t nat -A OUTPUT -d 127.0.0.0/8 -j RETURN
+    $IPT -t nat -A OUTPUT -p tcp -j REDIRECT --to-ports 9040
+    $IPT -t nat -A OUTPUT -p udp --dport 53 -j REDIRECT --to-ports 5353
     echo "[freeflix] Tor is active. All traffic is being routed through Tor."
   else
     echo "[freeflix] WARNING: Could not find debian-tor user, iptables rules not applied"
