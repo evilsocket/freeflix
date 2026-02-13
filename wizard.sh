@@ -69,7 +69,9 @@ ask_yn() {
 build_cmd() {
   CMD=(docker run -it --rm --name freeflix)
 
-  [ -n "$LOCAL_MODEL_URL" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
+  if [ -n "$LOCAL_MODEL_URL" ] || echo "${PLEX_URL:-}" | grep -q "host.docker.internal"; then
+    CMD+=(--add-host=host.docker.internal:host-gateway)
+  fi
   [ -n "$ANTHROPIC_API_KEY" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
   [ -n "$OPENAI_API_KEY" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
   [ -n "$OPENCODE_MODEL" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
@@ -79,6 +81,8 @@ build_cmd() {
   [ -n "$LOCAL_PROVIDER_NAME" ]    && CMD+=(-e "LOCAL_PROVIDER_NAME=$LOCAL_PROVIDER_NAME")
   [ -n "$TRAKT_CLIENT_ID" ]        && CMD+=(-e "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID")
   [ -n "$TRAKT_CLIENT_SECRET" ]    && CMD+=(-e "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET")
+  [ -n "$PLEX_URL" ]               && CMD+=(-e "PLEX_URL=$PLEX_URL")
+  [ -n "$PLEX_TOKEN" ]             && CMD+=(-e "PLEX_TOKEN=$PLEX_TOKEN")
   [ -n "$TELEGRAM_BOT_TOKEN" ]     && CMD+=(-e "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN")
   [ -n "$TELEGRAM_ALLOWED_USERS" ] && CMD+=(-e "TELEGRAM_ALLOWED_USERS=$TELEGRAM_ALLOWED_USERS")
 
@@ -107,6 +111,12 @@ show_summary() {
     echo "  Trakt:           Disabled"
   fi
 
+  if [ -n "$PLEX_URL" ]; then
+    echo "  Plex:            Enabled ($PLEX_URL)"
+  else
+    echo "  Plex:            Disabled"
+  fi
+
   if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
     echo "  Telegram:        Enabled ($(mask "$TELEGRAM_BOT_TOKEN"))"
     [ -n "$TELEGRAM_ALLOWED_USERS" ] && echo "  Allowed users:   $TELEGRAM_ALLOWED_USERS"
@@ -130,6 +140,8 @@ OPENCODE_MODEL="$OPENCODE_MODEL"
 OPENCODE_API_KEY="$OPENCODE_API_KEY"
 TRAKT_CLIENT_ID="$TRAKT_CLIENT_ID"
 TRAKT_CLIENT_SECRET="$TRAKT_CLIENT_SECRET"
+PLEX_URL="$PLEX_URL"
+PLEX_TOKEN="$PLEX_TOKEN"
 TELEGRAM_BOT_TOKEN="$TELEGRAM_BOT_TOKEN"
 TELEGRAM_ALLOWED_USERS="$TELEGRAM_ALLOWED_USERS"
 LOCAL_MODEL_URL="$LOCAL_MODEL_URL"
@@ -178,7 +190,9 @@ source "$ENV_FILE"
 
 CMD=(docker run -it --rm --name freeflix)
 
-[ -n "${LOCAL_MODEL_URL:-}" ]        && CMD+=(--add-host=host.docker.internal:host-gateway)
+if [ -n "${LOCAL_MODEL_URL:-}" ] || echo "${PLEX_URL:-}" | grep -q "host.docker.internal"; then
+  CMD+=(--add-host=host.docker.internal:host-gateway)
+fi
 [ -n "${ANTHROPIC_API_KEY:-}" ]      && CMD+=(-e "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY")
 [ -n "${OPENAI_API_KEY:-}" ]         && CMD+=(-e "OPENAI_API_KEY=$OPENAI_API_KEY")
 [ -n "${OPENCODE_MODEL:-}" ]         && CMD+=(-e "OPENCODE_MODEL=$OPENCODE_MODEL")
@@ -188,6 +202,8 @@ CMD=(docker run -it --rm --name freeflix)
 [ -n "${LOCAL_PROVIDER_NAME:-}" ]    && CMD+=(-e "LOCAL_PROVIDER_NAME=$LOCAL_PROVIDER_NAME")
 [ -n "${TRAKT_CLIENT_ID:-}" ]        && CMD+=(-e "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID")
 [ -n "${TRAKT_CLIENT_SECRET:-}" ]    && CMD+=(-e "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET")
+[ -n "${PLEX_URL:-}" ]              && CMD+=(-e "PLEX_URL=$PLEX_URL")
+[ -n "${PLEX_TOKEN:-}" ]            && CMD+=(-e "PLEX_TOKEN=$PLEX_TOKEN")
 [ -n "${TELEGRAM_BOT_TOKEN:-}" ]     && CMD+=(-e "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN")
 [ -n "${TELEGRAM_ALLOWED_USERS:-}" ] && CMD+=(-e "TELEGRAM_ALLOWED_USERS=$TELEGRAM_ALLOWED_USERS")
 
@@ -269,6 +285,8 @@ OPENCODE_MODEL=""
 OPENCODE_API_KEY=""
 TRAKT_CLIENT_ID=""
 TRAKT_CLIENT_SECRET=""
+PLEX_URL=""
+PLEX_TOKEN=""
 TELEGRAM_BOT_TOKEN=""
 TELEGRAM_ALLOWED_USERS=""
 LOCAL_MODEL_URL=""
@@ -394,6 +412,28 @@ if ask_yn "Enable Trakt?" "$TRAKT_DEFAULT"; then
 else
   TRAKT_CLIENT_ID=""
   TRAKT_CLIENT_SECRET=""
+fi
+
+# ── Plex ──
+header "Plex Integration"
+echo -e "  ${DIM}Connect your Plex Media Server to browse, search, and play your library.${RESET}"
+echo -e "  ${DIM}To find your token: open Plex Web, open browser Dev Tools, run in Console:${RESET}"
+echo -e "  ${DIM}window.localStorage.getItem('myPlexAccessToken')${RESET}"
+echo ""
+
+PLEX_DEFAULT="n"
+[ -n "$PLEX_URL" ] && PLEX_DEFAULT="y"
+
+if ask_yn "Enable Plex?" "$PLEX_DEFAULT"; then
+  PLEX_URL=$(ask "Plex server URL" "${PLEX_URL:-http://host.docker.internal:32400}")
+  PLEX_TOKEN=$(ask "Plex token" "$PLEX_TOKEN")
+  if [ -z "$PLEX_URL" ] || [ -z "$PLEX_TOKEN" ]; then
+    error "  Both URL and token are required"
+    exit 1
+  fi
+else
+  PLEX_URL=""
+  PLEX_TOKEN=""
 fi
 
 # ── Telegram ──

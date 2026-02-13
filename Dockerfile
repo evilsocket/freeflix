@@ -59,6 +59,9 @@ RUN pip3 install --break-system-packages python-telegram-bot telegramify-markdow
 RUN git clone https://github.com/wwiens/trakt_mcpserver /opt/trakt_mcpserver && \
     pip3 install --break-system-packages -r /opt/trakt_mcpserver/requirements.txt
 
+# Plex MCP Server
+RUN pip3 install --break-system-packages plex-mcp-server
+
 # ── Stage 3: Final image (config + entrypoint, fast to rebuild) ──
 FROM tools AS final
 

@@ -31,7 +31,7 @@ That's it. No accounts, no API keys, no registration — by default Freeflix use
 The wizard will:
 
 1. Check that Docker is installed and running.
-2. Walk you through optional features (bring-your-own LLM key, Trakt, Telegram).
+2. Walk you through optional features (bring-your-own LLM key, Trakt, Plex, Telegram).
 3. Save your config to `~/.freeflix/.env`.
 4. Optionally install a `freeflix` command in your PATH so you can start it anytime.
 5. Pull the Docker image and start the container.
@@ -61,6 +61,8 @@ Just type naturally. Some examples:
 - *"What's downloading right now?"*
 - *"Get me the Neuromancer audiobook"*
 - *"Recommend something based on my Trakt history"*
+- *"What's in my Plex library?"*
+- *"Play Inception on my living room TV"*
 
 ## Personalized Recommendations with Trakt
 
@@ -77,6 +79,20 @@ To set it up, create a free Trakt API app at [trakt.tv/oauth/applications](https
 
 This is entirely optional — Freeflix works fine without it.
 
+## Plex
+
+If you run a [Plex Media Server](https://www.plex.tv/), connect it via the wizard to let the AI browse your library, check what you already own before downloading, and even start playback on your devices. Powered by the [Plex MCP server](https://github.com/vladimir-tutin/plex-mcp-server).
+
+You'll need your Plex server URL and an authentication token.
+
+**Finding your token:** sign in to the [Plex Web App](https://app.plex.tv), open your browser's Developer Tools, go to the Console tab, and run:
+
+```js
+window.localStorage.getItem('myPlexAccessToken')
+```
+
+**Server URL:** if Plex runs on the same machine as Docker, use `http://host.docker.internal:32400` (the wizard default). If it's on another machine on your LAN, use its IP directly (e.g. `http://192.168.1.100:32400`).
+
 ## Telegram
 
 When enabled via the wizard, you can also chat with the AI through a Telegram bot. The bot and terminal share the same session, so you can switch between them freely.
@@ -91,6 +107,7 @@ Freeflix orchestrates several components inside a single container:
 - **[Torra](https://github.com/stabldev/torrra)** — torrent downloader with a TUI
 - **[OpenCode](https://opencode.ai/)** — AI agent with a custom system prompt for media search and download
 - **[Trakt MCP](https://github.com/wwiens/trakt_mcpserver)** *(optional)* — personalized recommendations from your watch history
+- **[Plex MCP](https://github.com/vladimir-tutin/plex-mcp-server)** *(optional)* — browse, search, and play content from your Plex server
 
 ## Configuration
 
@@ -104,6 +121,8 @@ All settings are stored in `~/.freeflix/.env` (created by the wizard). You can e
 | `OPENCODE_API_KEY` | API key for custom model |
 | `TRAKT_CLIENT_ID` | Trakt app client ID ([create one here](https://trakt.tv/oauth/applications)) |
 | `TRAKT_CLIENT_SECRET` | Trakt app client secret |
+| `PLEX_URL` | Plex server URL (e.g. `http://host.docker.internal:32400`) |
+| `PLEX_TOKEN` | Plex authentication token ([how to find it](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)) |
 | `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs |
 | `LOCAL_MODEL_URL` | Base URL for local OpenAI-compatible API (e.g. `http://host.docker.internal:11434/v1`) |

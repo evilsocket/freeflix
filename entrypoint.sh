@@ -167,7 +167,19 @@ else
          /work/AGENT_PROMPT.md
 fi
 
-# OpenCode config: set model and conditionally inject Trakt MCP
+# Plex: include or strip section based on credentials
+if [ -n "${PLEX_URL:-}" ] && [ -n "${PLEX_TOKEN:-}" ]; then
+  sed -i -e 's|{{PLEX_INTRO}}|You also have **Plex MCP tools** to browse, search, and play content from the user'\''s Plex Media Server.|' \
+         -e '/{{PLEX_SECTION_START}}/d' \
+         -e '/{{PLEX_SECTION_END}}/d' \
+         /work/AGENT_PROMPT.md
+else
+  sed -i -e '/{{PLEX_INTRO}}/d' \
+         -e '/{{PLEX_SECTION_START}}/,/{{PLEX_SECTION_END}}/d' \
+         /work/AGENT_PROMPT.md
+fi
+
+# OpenCode config: set model and conditionally inject MCP servers
 MCP_SECTION='{}'
 if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
   echo "[freeflix] Trakt credentials found, enabling Trakt MCP server"
@@ -187,6 +199,26 @@ if [ -n "$TRAKT_CLIENT_ID" ] && [ -n "$TRAKT_CLIENT_SECRET" ]; then
     }')
 else
   echo "[freeflix] No Trakt credentials, Trakt MCP disabled"
+fi
+
+if [ -n "${PLEX_URL:-}" ] && [ -n "${PLEX_TOKEN:-}" ]; then
+  echo "[freeflix] Plex credentials found, enabling Plex MCP server"
+  PLEX_MCP=$(jq -n \
+    --arg url "$PLEX_URL" \
+    --arg token "$PLEX_TOKEN" \
+    '{
+      plex: {
+        type: "local",
+        command: ["plex-mcp-server", "--transport", "stdio"],
+        environment: {
+          PLEX_URL: $url,
+          PLEX_TOKEN: $token
+        }
+      }
+    }')
+  MCP_SECTION=$(echo "$MCP_SECTION" | jq --argjson plex "$PLEX_MCP" '. + $plex')
+else
+  echo "[freeflix] No Plex credentials, Plex MCP disabled"
 fi
 
 jq --arg model "$MODEL" --argjson mcp "$MCP_SECTION" --argjson provider "$PROVIDER_SECTION" \
