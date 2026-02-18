@@ -61,15 +61,12 @@ def strip_ansi(text: str) -> str:
 
 
 _TOOL_LINE_RE = re.compile(r"^(\$ |⚙ )")
+_ERROR_LINE_RE = re.compile(r"(?i)(error|fail|exception|errno)")
 _STATUS_LINE_RE = re.compile(r"^> \S+ · ")
 
 
 def format_for_telegram(raw: str) -> str:
-    """Separate tool calls from assistant text.
-
-    Tool call blocks (including their output) become expandable blockquotes
-    in MarkdownV2. Assistant text is converted via telegramify_markdown.
-    """
+    """Replace tool call blocks with a compact summary, keep assistant text."""
     lines = raw.split("\n")
 
     # First pass: find indices of all tool call lines ($ or ⚙)
@@ -78,10 +75,8 @@ def format_for_telegram(raw: str) -> str:
         if _TOOL_LINE_RE.match(line):
             tool_line_indices.add(i)
 
-    # Second pass: mark each line as "tool", "status" (skip), or "text".
-    # Lines between tool calls are tool output. After the LAST tool call,
-    # only the final paragraph (after a blank line) is assistant text.
-    labels: list[str] = []  # "tool", "text", or "skip"
+    # Second pass: label each line as "tool", "status" (skip), or "text"
+    labels: list[str] = []
     in_tool = False
 
     for i, line in enumerate(lines):
@@ -93,19 +88,13 @@ def format_for_telegram(raw: str) -> str:
             in_tool = True
             labels.append("tool")
         elif in_tool:
-            # Check if there are more tool calls ahead
             has_more_tools = any(j > i for j in tool_line_indices)
             if has_more_tools:
-                # Between tool calls — this is tool output
                 labels.append("tool")
             else:
-                # After the last tool call. Tool output continues until
-                # we hit a blank line, then the rest is assistant text.
-                # Look backwards: was there a blank line between last tool and here?
                 last_tool = max(j for j in tool_line_indices if j <= i)
                 preceding = lines[last_tool + 1:i]
                 if any(l.strip() == "" for l in preceding) and line.strip() != "":
-                    # We're past a blank separator after the last tool output
                     in_tool = False
                     labels.append("text")
                 else:
@@ -113,37 +102,57 @@ def format_for_telegram(raw: str) -> str:
         else:
             labels.append("text")
 
-    # Third pass: group consecutive same-label lines into sections
-    sections: list[tuple[str, list[str]]] = []
+    # Third pass: group consecutive same-label lines and build output
+    parts: list[str] = []
+    tool_count = 0
+    error_count = 0
+    pending_tool_lines: list[str] = []
+
+    def flush_tools():
+        nonlocal tool_count, error_count, pending_tool_lines
+        if tool_count == 0:
+            return
+        summary = f"🔧 _{tool_count} tool call{'s' if tool_count != 1 else ''}"
+        if error_count > 0:
+            summary += f", {error_count} error{'s' if error_count != 1 else ''}"
+        summary += "_"
+        parts.append(summary)
+        tool_count = 0
+        error_count = 0
+        pending_tool_lines = []
+
     for i, line in enumerate(lines):
         label = labels[i]
         if label == "skip":
             continue
-        if sections and sections[-1][0] == label:
-            sections[-1][1].append(line)
+        if label == "tool":
+            if _TOOL_LINE_RE.match(line):
+                tool_count += 1
+            if _ERROR_LINE_RE.search(line):
+                error_count += 1
+            pending_tool_lines.append(line)
         else:
-            sections.append((label, [line]))
+            flush_tools()
+            # Collect consecutive text lines
+            if parts and not parts[-1].startswith("🔧"):
+                parts[-1] += "\n" + line
+            else:
+                parts.append(line)
 
-    # Fourth pass: render sections
-    parts: list[str] = []
-    for stype, slines in sections:
-        text = "\n".join(slines).strip()
-        if not text:
+    flush_tools()
+
+    # Render: tool summaries are already formatted, text goes through telegramify
+    rendered: list[str] = []
+    for part in parts:
+        part = part.strip()
+        if not part:
             continue
-        if stype == "tool":
-            # MarkdownV2 expandable blockquote: **>line\n>line\n>last||
-            escaped = escape_markdown(text, version=2)
-            bq_lines = escaped.split("\n")
-            quoted = "\n".join(
-                ("**>" if i == 0 else ">") + l
-                for i, l in enumerate(bq_lines)
-            )
-            quoted += "||"
-            parts.append(quoted)
+        if part.startswith("🔧"):
+            rendered.append(escape_markdown(part, version=2))
         else:
-            parts.append(telegramify_markdown.markdownify(text))
+            rendered.append(telegramify_markdown.markdownify(part))
 
-    return "\n\n".join(parts)
+    return "\n\n".join(rendered)
 
 
 def split_message(text: str, max_len: int = TELEGRAM_MAX_LEN) -> list[str]:
